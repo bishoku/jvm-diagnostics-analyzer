@@ -1,0 +1,16 @@
+services:
+  heap-analyzer:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - JAVA_OPTS=-Xms512m -Xmx2g
+      - APP_STORAGE_LOCATION=/data/heap-dumps
+      - APP_MAT_HOME=/opt/mat
+    volumes:
+      - heap-data:/data/heap-dumps
+    restart: unless-stopped
+
+volumes:
+  heap-data:

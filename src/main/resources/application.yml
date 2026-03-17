@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5GB
+      max-request-size: 5GB
+      file-size-threshold: 10MB
+      resolve-lazily: true
+
+  ai:
+    openai:
+      api-key: ${OPENROUTER_API_KEY:sk-placeholder}
+      base-url: https://openrouter.ai/api
+      chat:
+        options:
+          model: openai/gpt-oss-120b
+          temperature: 0.3
+
+  thymeleaf:
+    cache: false
+
+app:
+  storage:
+    location: ./heap-dumps
+  mat:
+    home: ${APP_MAT_HOME:/opt/mat}
+    timeout-minutes: 30
+  async:
+    core-pool-size: 2
+    max-pool-size: 4
+    queue-capacity: 10
