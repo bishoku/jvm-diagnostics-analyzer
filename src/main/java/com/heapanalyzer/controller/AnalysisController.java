@@ -302,13 +302,6 @@ public class AnalysisController {
         return handleUpload(file, AnalysisType.GC_LOG, null, "gc.log");
     }
 
-    /** Legacy endpoint — kept for backward compatibility. */
-    @PostMapping("/api/analysis/upload")
-    @ResponseBody
-    public ResponseEntity<?> uploadLegacy(@RequestParam("file") MultipartFile file) {
-        return uploadHeapDump(file);
-    }
-
     // ========================== Status Endpoint ==========================
 
     /**
