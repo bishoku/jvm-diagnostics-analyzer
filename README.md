@@ -31,6 +31,19 @@ Built with **Spring Boot 4**, **Java 25**, **Eclipse MAT**, and **Spring AI**.
 
 ---
 
+## Screenshots
+
+### Landing Page
+![Overview](img/overview.png)
+
+### File Upload & Analysis Pipeline
+![Step 1](img/step_1.png)
+
+### Analysis Result
+![Result](img/result.png)
+
+---
+
 ## Prerequisites
 
 | Requirement | Details |
