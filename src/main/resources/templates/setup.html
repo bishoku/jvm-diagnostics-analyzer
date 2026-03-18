@@ -336,6 +336,14 @@
             </div>
         </div>
 
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;">
+                <input type="checkbox" id="trustInsecure" style="width: auto; accent-color: var(--yk-blue);"/>
+                Trust insecure TLS certificates
+            </label>
+            <span class="hint" style="margin-left: 26px;">Enable for on-prem models with self-signed certificates. ⚠ Disables certificate validation.</span>
+        </div>
+
         <div class="btn-group">
             <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
@@ -362,6 +370,7 @@
     const baseUrlInput = document.getElementById('baseUrl');
     const modelInput = document.getElementById('model');
     const temperatureInput = document.getElementById('temperature');
+    const trustInsecureInput = document.getElementById('trustInsecure');
     const saveBtn = document.getElementById('saveBtn');
     const testBtn = document.getElementById('testBtn');
     const statusMsg = document.getElementById('statusMsg');
@@ -376,6 +385,7 @@
             baseUrlInput.value = data.baseUrl || 'https://openrouter.ai/api';
             modelInput.value = data.model || 'openai/gpt-4o';
             temperatureInput.value = data.temperature || 0.3;
+            trustInsecureInput.checked = data.trustInsecureCerts || false;
 
             if (data.configured) {
                 apiKeyInput.placeholder = 'Configured: ' + data.maskedApiKey + ' (enter new key to change)';
@@ -403,7 +413,8 @@
         const body = {
             baseUrl: baseUrlInput.value.trim() || 'https://openrouter.ai/api',
             model: modelInput.value.trim() || 'openai/gpt-4o',
-            temperature: temperatureInput.value || '0.3'
+            temperature: temperatureInput.value || '0.3',
+            trustInsecureCerts: String(trustInsecureInput.checked)
         };
 
         // Only include API key if user entered a new one

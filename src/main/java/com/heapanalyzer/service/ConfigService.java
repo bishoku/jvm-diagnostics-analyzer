@@ -31,6 +31,7 @@ public class ConfigService {
     public static final String KEY_BASE_URL = "base-url";
     public static final String KEY_MODEL = "model";
     public static final String KEY_TEMPERATURE = "temperature";
+    public static final String KEY_TRUST_INSECURE = "trust-insecure-certs";
 
     // Defaults
     private static final String DEFAULT_BASE_URL = "https://openrouter.ai/api";
@@ -109,13 +110,28 @@ public class ConfigService {
     }
 
     /**
+     * Returns true if insecure TLS certificates should be trusted.
+     * For on-prem models with self-signed certificates.
+     */
+    public boolean isTrustInsecureCerts() {
+        String env = System.getenv("AI_TRUST_INSECURE_CERTS");
+        if (env != null && !env.isBlank()) return Boolean.parseBoolean(env);
+        return Boolean.parseBoolean(properties.getProperty(KEY_TRUST_INSECURE, "false"));
+    }
+
+    /**
      * Saves settings to the config file and updates in-memory properties.
      */
     public void save(String apiKey, String baseUrl, String model, String temperature) {
+        save(apiKey, baseUrl, model, temperature, null);
+    }
+
+    public void save(String apiKey, String baseUrl, String model, String temperature, String trustInsecure) {
         properties.setProperty(KEY_API_KEY, apiKey);
         properties.setProperty(KEY_BASE_URL, baseUrl != null ? baseUrl : DEFAULT_BASE_URL);
         properties.setProperty(KEY_MODEL, model != null ? model : DEFAULT_MODEL);
         properties.setProperty(KEY_TEMPERATURE, temperature != null ? temperature : DEFAULT_TEMPERATURE);
+        properties.setProperty(KEY_TRUST_INSECURE, trustInsecure != null ? trustInsecure : "false");
 
         try {
             Files.createDirectories(configFile.getParent());

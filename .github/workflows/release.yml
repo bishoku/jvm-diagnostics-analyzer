@@ -60,7 +60,8 @@ jobs:
           mkdir -p jpackage-input
           cp ${{ steps.jar.outputs.jar }} jpackage-input/
 
-      - name: Build Native Installer
+      - name: Build Native Installer (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           jpackage \
@@ -74,6 +75,28 @@ jobs:
             --java-options "-Xms256m" \
             --java-options "-Xmx2g" \
             --java-options "-Dapp.browser.auto-open=true" \
+            --linux-shortcut \
+            --linux-menu-group "Development" \
+            --dest target/installer
+
+      - name: Build Native Installer (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          jpackage \
+            --input jpackage-input \
+            --main-jar $(basename ${{ steps.jar.outputs.jar }}) \
+            --name "JVM Diagnostics" \
+            --app-version "${{ steps.version.outputs.version }}" \
+            --vendor "bishokudev" \
+            --description "AI-powered JVM diagnostics analyzer" \
+            --type ${{ matrix.jpackage-type }} \
+            --java-options "-Xms256m" \
+            --java-options "-Xmx2g" \
+            --java-options "-Dapp.browser.auto-open=true" \
+            --win-shortcut \
+            --win-menu \
+            --win-menu-group "JVM Diagnostics" \
             --dest target/installer
 
       - name: Find installer file

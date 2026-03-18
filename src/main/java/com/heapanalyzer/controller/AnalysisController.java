@@ -125,6 +125,7 @@ public class AnalysisController {
                 "baseUrl", configService.getBaseUrl(),
                 "model", configService.getModel(),
                 "temperature", configService.getTemperature(),
+                "trustInsecureCerts", configService.isTrustInsecureCerts(),
                 "configFile", configService.getConfigFilePath().toString()
         ));
     }
@@ -143,7 +144,8 @@ public class AnalysisController {
                 apiKey,
                 body.getOrDefault("baseUrl", "https://openrouter.ai/api"),
                 body.getOrDefault("model", "openai/gpt-4o"),
-                body.getOrDefault("temperature", "0.3")
+                body.getOrDefault("temperature", "0.3"),
+                body.getOrDefault("trustInsecureCerts", "false")
         );
 
         try {

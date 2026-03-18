@@ -139,13 +139,43 @@ public class SpringAiService {
         String baseUrl = configService.getBaseUrl();
         String model = configService.getModel();
         double temperature = configService.getTemperature();
+        boolean trustInsecure = configService.isTrustInsecureCerts();
 
-        log.info("Configuring AI client: baseUrl={}, model={}, temperature={}", baseUrl, model, temperature);
+        log.info("Configuring AI client: baseUrl={}, model={}, temperature={}, trustInsecureCerts={}",
+                baseUrl, model, temperature, trustInsecure);
 
-        OpenAiApi openAiApi = OpenAiApi.builder()
+        var apiBuilder = OpenAiApi.builder()
                 .apiKey(apiKey)
-                .baseUrl(baseUrl)
-                .build();
+                .baseUrl(baseUrl);
+
+        if (trustInsecure) {
+            log.warn("⚠ Trusting ALL TLS certificates — this disables certificate validation!");
+            try {
+                var trustAll = new javax.net.ssl.X509TrustManager() {
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+                };
+
+                var sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
+                sslContext.init(null, new javax.net.ssl.TrustManager[]{trustAll}, new java.security.SecureRandom());
+
+                var httpClient = java.net.http.HttpClient.newBuilder()
+                        .sslContext(sslContext)
+                        .build();
+
+                var requestFactory = new org.springframework.http.client.JdkClientHttpRequestFactory(httpClient);
+                var restClientBuilder = org.springframework.web.client.RestClient.builder()
+                        .requestFactory(requestFactory);
+
+                apiBuilder.restClientBuilder(restClientBuilder);
+            } catch (Exception e) {
+                log.error("Failed to configure insecure TLS: {}", e.getMessage());
+                throw new RuntimeException("Failed to configure insecure TLS", e);
+            }
+        }
+
+        OpenAiApi openAiApi = apiBuilder.build();
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(model)

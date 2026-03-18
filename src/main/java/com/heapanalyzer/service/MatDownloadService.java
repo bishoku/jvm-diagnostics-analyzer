@@ -245,10 +245,16 @@ public class MatDownloadService {
 
     private void makeScriptsExecutable(Path dir) {
         try (var stream = Files.walk(dir)) {
-            stream.filter(p -> p.getFileName().toString().endsWith(".sh"))
+            stream.filter(p -> {
+                        String name = p.getFileName().toString();
+                        return name.endsWith(".sh")
+                                || name.equals("MemoryAnalyzer")
+                                || name.equals("ParseHeapDump");
+                    })
                     .forEach(p -> {
                         try {
-                            p.toFile().setExecutable(true);
+                            p.toFile().setExecutable(true, false);
+                            log.info("Made executable: {}", p);
                         } catch (Exception e) {
                             log.warn("Could not make {} executable", p.getFileName());
                         }

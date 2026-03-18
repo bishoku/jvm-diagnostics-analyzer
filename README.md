@@ -58,11 +58,25 @@ Built with **Spring Boot 4**, **Java 25**, **Eclipse MAT**, and **Spring AI**.
 
 Docker is the easiest way to run the app because the image **bundles Eclipse MAT** automatically.
 
-### Using Docker Compose
+### Using Pre-built Image
+
+No need to clone or build — just run:
+
+```bash
+docker run -d \
+  --name jvm-diagnostics \
+  -p 8080:8080 \
+  -v jvm-uploads:/data/uploads \
+  barishoku/jvm-dump-analyzer:0.0.2
+```
+
+Open **http://localhost:8080** — you'll be guided through API key setup on first launch.
+
+### Building from Source with Docker Compose
 
 ```bash
 # 1. Clone the project
-git clone https://github.com/your-username/jvm-diagnostics-analyzer.git
+git clone https://github.com/bishoku/jvm-diagnostics-analyzer.git
 cd jvm-diagnostics-analyzer
 
 # 2. Configure your API key
