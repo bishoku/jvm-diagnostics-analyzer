@@ -3,369 +3,483 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Heap Dump Analyzer</title>
-    <meta name="description" content="Analyze JVM heap dumps with AI-powered insights"/>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        surface: {
-                            50: '#f8fafc',
-                            100: '#f1f5f9',
-                            700: '#1e293b',
-                            800: '#0f172a',
-                            900: '#020617',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
+    <title>JVM Diagnostics Analyzer — AI-Powered JVM Analysis</title>
+    <meta name="description" content="AI-powered JVM diagnostics: analyze heap dumps, thread dumps, and GC logs with actionable insights."/>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet"/>
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(148, 163, 184, 0.1); }
-        .glow { box-shadow: 0 0 60px -15px rgba(99, 102, 241, 0.3); }
-        .glow-success { box-shadow: 0 0 60px -15px rgba(34, 197, 94, 0.3); }
-        .glow-error { box-shadow: 0 0 60px -15px rgba(239, 68, 68, 0.3); }
-        .gradient-text { background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .drop-zone.dragover { border-color: #818cf8; background: rgba(99, 102, 241, 0.08); }
-        .progress-bar { transition: width 0.3s ease; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse-dot { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
-        .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
-        .pulse-dot:nth-child(2) { animation-delay: 0.2s; }
-        .pulse-dot:nth-child(3) { animation-delay: 0.4s; }
+        /* ========================== Yapı Kredi Design System ========================== */
+        :root {
+            --yk-blue: #004990;
+            --yk-blue-dark: #003366;
+            --yk-blue-light: #1a6bc4;
+            --yk-blue-hover: #005bb5;
+            --yk-red: #D9322D;
+            --yk-red-hover: #c12a26;
+            --yk-white: #FFFFFF;
+            --yk-bg-light: #F5F7FA;
+            --yk-bg-section: #EDF1F7;
+            --yk-text-primary: #282828;
+            --yk-text-secondary: #5a6a7a;
+            --yk-text-muted: #8b95a5;
+            --yk-border: #e0e6ed;
+            --yk-shadow: 0 2px 12px rgba(0, 73, 144, 0.08);
+            --yk-shadow-hover: 0 8px 30px rgba(0, 73, 144, 0.15);
+            --yk-radius: 12px;
+            --yk-radius-sm: 8px;
+        }
 
-        /* Markdown result styling */
-        .ai-result h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: #e2e8f0; }
-        .ai-result h2 { font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem; color: #cbd5e1; }
-        .ai-result h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.5rem; color: #94a3b8; }
-        .ai-result p { margin: 0.5rem 0; line-height: 1.7; color: #cbd5e1; }
-        .ai-result ul, .ai-result ol { margin: 0.5rem 0 0.5rem 1.5rem; color: #cbd5e1; }
-        .ai-result li { margin: 0.25rem 0; line-height: 1.6; }
-        .ai-result code { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
-        .ai-result pre { background: rgba(2, 6, 23, 0.8); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 0.5rem; padding: 1rem; margin: 0.75rem 0; overflow-x: auto; }
-        .ai-result pre code { background: none; padding: 0; color: #e2e8f0; }
-        .ai-result strong { color: #e2e8f0; font-weight: 600; }
-        .ai-result blockquote { border-left: 3px solid #818cf8; padding-left: 1rem; margin: 0.75rem 0; color: #94a3b8; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        .step-connector { width: 2px; height: 24px; margin: 0 auto; }
+        body {
+            font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--yk-bg-light);
+            color: var(--yk-text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ========================== Navigation ========================== */
+        .nav {
+            background: var(--yk-blue);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--yk-white);
+        }
+
+        .nav-brand-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--yk-white);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-brand-icon svg {
+            width: 22px;
+            height: 22px;
+            color: var(--yk-blue);
+        }
+
+        .nav-brand-text {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--yk-white);
+        }
+
+        /* ========================== Hero Section ========================== */
+        .hero {
+            background: linear-gradient(135deg, var(--yk-blue) 0%, var(--yk-blue-dark) 100%);
+            padding: 4rem 2rem 5rem;
+            text-align: center;
+            color: var(--yk-white);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(10px);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .hero h1 {
+            font-size: 2.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+            letter-spacing: -0.5px;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+            max-width: 550px;
+            margin: 0 auto;
+        }
+
+        /* ========================== Tool Cards ========================== */
+        .tools-section {
+            max-width: 1100px;
+            margin: -3rem auto 3rem;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .tool-card {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            padding: 2rem 1.75rem;
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-border);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .tool-card:hover {
+            box-shadow: var(--yk-shadow-hover);
+            transform: translateY(-4px);
+            border-color: var(--yk-blue-light);
+        }
+
+        .tool-card-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .tool-card-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--yk-white);
+        }
+
+        .tool-card-icon.heap { background: linear-gradient(135deg, #004990, #1a6bc4); }
+        .tool-card-icon.thread { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+        .tool-card-icon.gc { background: linear-gradient(135deg, #059669, #34d399); }
+
+        .tool-card h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--yk-text-primary);
+        }
+
+        .tool-card p {
+            font-size: 0.9rem;
+            color: var(--yk-text-secondary);
+            line-height: 1.6;
+            flex-grow: 1;
+            margin-bottom: 1.25rem;
+        }
+
+        .tool-card-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--yk-blue);
+            transition: gap 0.2s ease;
+        }
+
+        .tool-card:hover .tool-card-cta {
+            gap: 10px;
+        }
+
+        .tool-card-cta svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ========================== Features Section ========================== */
+        .features-section {
+            background: var(--yk-white);
+            padding: 4rem 2rem;
+            border-top: 1px solid var(--yk-border);
+        }
+
+        .features-container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .features-container h2 {
+            text-align: center;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--yk-text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .features-subtitle {
+            text-align: center;
+            color: var(--yk-text-secondary);
+            margin-bottom: 2.5rem;
+            font-size: 1rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: 1.5rem 1rem;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-item h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            color: var(--yk-text-primary);
+        }
+
+        .feature-item p {
+            font-size: 0.8rem;
+            color: var(--yk-text-muted);
+            line-height: 1.5;
+        }
+
+        /* ========================== Footer ========================== */
+        .footer {
+            margin-top: auto;
+            background: var(--yk-blue-dark);
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            padding: 1.5rem 2rem;
+            font-size: 0.8rem;
+        }
+
+        .footer a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            color: var(--yk-white);
+        }
+
+        /* ========================== Responsive ========================== */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .tools-grid { grid-template-columns: 1fr; }
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .nav-links { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .features-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
-<body class="bg-surface-900 text-slate-200 min-h-screen">
+<body>
 
-<!-- Background decoration -->
-<div class="fixed inset-0 overflow-hidden pointer-events-none">
-    <div class="absolute -top-40 -right-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute top-1/3 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute bottom-0 right-1/4 w-72 h-72 bg-pink-500/8 rounded-full blur-3xl"></div>
-</div>
-
-<div class="relative max-w-4xl mx-auto px-6 py-12">
-
-    <!-- Header -->
-    <header class="text-center mb-12">
-        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-xs font-medium text-indigo-300 mb-6">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            Powered by Eclipse MAT + OpenAI
+<!-- Navigation -->
+<nav class="nav">
+    <a href="/" class="nav-brand">
+        <div class="nav-brand-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
         </div>
-        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
-            <span class="gradient-text">Heap Dump Analyzer</span>
-        </h1>
-        <p class="text-slate-400 text-lg max-w-xl mx-auto">
-            Upload your <code class="text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded text-sm font-mono">.hprof</code> file and get AI-powered memory leak insights in seconds.
-        </p>
-    </header>
+        <span class="nav-brand-text">JVM Diagnostics</span>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/heap">Heap Dump</a></li>
+        <li><a href="/thread-dump">Thread Dump</a></li>
+        <li><a href="/gc-log">GC Log</a></li>
+    </ul>
+</nav>
 
-    <!-- Upload Section -->
-    <section id="upload-section" class="mb-10 fade-in">
-        <div id="drop-zone"
-             class="drop-zone glass rounded-2xl glow p-10 text-center cursor-pointer transition-all duration-300 hover:border-indigo-400/40">
-            <div class="mb-4">
-                <svg class="w-14 h-14 mx-auto text-indigo-400/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+            </svg>
+            Powered by AI · Spring Boot · Eclipse MAT
+        </div>
+        <h1>AI-Powered JVM Diagnostics</h1>
+        <p>Upload your JVM diagnostic files and get actionable insights in seconds. Analyze heap dumps, thread dumps, and GC logs with AI-powered recommendations.</p>
+    </div>
+</section>
+
+<!-- Tool Cards -->
+<section class="tools-section">
+    <div class="tools-grid">
+
+        <!-- Heap Dump -->
+        <a href="/heap" class="tool-card" id="tool-heap">
+            <div class="tool-card-icon heap">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>
                 </svg>
             </div>
-            <p class="text-lg font-medium text-slate-300 mb-1">Drag &amp; drop your heap dump here</p>
-            <p class="text-sm text-slate-500">or click to browse — supports <span class="text-indigo-400 font-mono">.hprof</span> files up to 5 GB</p>
-            <input type="file" id="file-input" accept=".hprof" class="hidden"/>
+            <h3>Heap Dump Analysis</h3>
+            <p>Upload <code>.hprof</code> files for deep memory analysis. Detects memory leaks, identifies top memory consumers, and provides code-level fix recommendations using Eclipse MAT + AI.</p>
+            <div class="tool-card-cta">
+                Analyze Heap Dump
+                <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                </svg>
+            </div>
+        </a>
+
+        <!-- Thread Dump -->
+        <a href="/thread-dump" class="tool-card" id="tool-thread">
+            <div class="tool-card-icon thread">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M12 17.25h8.25"/>
+                    <circle cx="6" cy="17.25" r="2.25" stroke-width="2"/>
+                </svg>
+            </div>
+            <h3>Thread Dump Analysis</h3>
+            <p>Upload thread dumps captured via <code>jstack</code> or <code>jcmd</code>. Detects deadlocks, analyzes thread states, identifies contention bottlenecks, and suggests concurrency fixes.</p>
+            <div class="tool-card-cta">
+                Analyze Thread Dump
+                <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                </svg>
+            </div>
+        </a>
+
+        <!-- GC Log -->
+        <a href="/gc-log" class="tool-card" id="tool-gc">
+            <div class="tool-card-icon gc">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+                </svg>
+            </div>
+            <h3>GC Log Analysis</h3>
+            <p>Upload GC logs from any collector (G1, ZGC, Shenandoah, CMS, Parallel). Analyzes pause times, heap usage patterns, and provides specific JVM tuning recommendations.</p>
+            <div class="tool-card-cta">
+                Analyze GC Log
+                <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                </svg>
+            </div>
+        </a>
+
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+    <div class="features-container">
+        <h2>Enterprise-Grade JVM Diagnostics</h2>
+        <p class="features-subtitle">Everything you need to troubleshoot JVM performance issues</p>
+        <div class="features-grid">
+            <div class="feature-item">
+                <div class="feature-icon">🔬</div>
+                <h4>Deep Static Analysis</h4>
+                <p>Eclipse MAT integration for comprehensive heap analysis</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🤖</div>
+                <h4>AI-Powered Insights</h4>
+                <p>GPT-4o interprets reports and provides actionable recommendations</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">📤</div>
+                <h4>Large File Support</h4>
+                <p>Stream uploads up to 5 GB directly to disk without buffering</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">⚡</div>
+                <h4>Async Pipeline</h4>
+                <p>Real-time progress tracking with non-blocking analysis</p>
+            </div>
         </div>
+    </div>
+</section>
 
-        <!-- Upload progress -->
-        <div id="upload-progress" class="hidden mt-6 glass rounded-xl p-5">
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-3">
-                    <svg class="w-5 h-5 text-indigo-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    <span id="upload-file-name" class="text-sm font-medium text-slate-300 truncate max-w-xs"></span>
-                </div>
-                <span id="upload-percent" class="text-sm font-mono text-indigo-400">0%</span>
-            </div>
-            <div class="w-full bg-surface-800 rounded-full h-2 overflow-hidden">
-                <div id="upload-bar" class="progress-bar h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" style="width: 0%"></div>
-            </div>
-            <p id="upload-size" class="text-xs text-slate-500 mt-2"></p>
-        </div>
-    </section>
+<!-- Footer -->
+<footer class="footer">
+    JVM Diagnostics Analyzer &middot; Spring Boot + Eclipse MAT + Spring AI &middot;
+    <a href="https://github.com" target="_blank">GitHub</a>
+</footer>
 
-    <!-- Status Pipeline -->
-    <section id="status-section" class="hidden mb-10 fade-in">
-        <div class="glass rounded-2xl p-6">
-            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-5">Analysis Pipeline</h2>
-            <div id="pipeline-steps" class="space-y-1">
-                <!-- Steps are injected by JS -->
-            </div>
-        </div>
-    </section>
-
-    <!-- Error -->
-    <section id="error-section" class="hidden mb-10 fade-in">
-        <div class="glass rounded-2xl glow-error p-6 border border-red-500/20">
-            <div class="flex items-start gap-3">
-                <svg class="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
-                <div>
-                    <h3 class="font-semibold text-red-300 mb-1">Analysis Failed</h3>
-                    <p id="error-message" class="text-sm text-red-400/80"></p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Static Report (collapsible) -->
-    <section id="static-report-section" class="hidden mb-6 fade-in">
-        <details class="glass rounded-2xl overflow-hidden">
-            <summary class="px-6 py-4 cursor-pointer text-sm font-semibold text-slate-400 hover:text-slate-300 flex items-center gap-2 select-none">
-                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
-                Eclipse MAT Static Report
-            </summary>
-            <div class="px-6 pb-5 border-t border-slate-700/50">
-                <pre id="static-report-content" class="text-xs font-mono text-slate-400 whitespace-pre-wrap mt-4 max-h-96 overflow-y-auto"></pre>
-            </div>
-        </details>
-    </section>
-
-    <!-- AI Results -->
-    <section id="results-section" class="hidden fade-in">
-        <div class="glass rounded-2xl glow-success p-8">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/></svg>
-                </div>
-                <div>
-                    <h2 class="text-xl font-bold text-slate-100">AI Analysis</h2>
-                    <p class="text-xs text-slate-500">Generated by GPT-4o</p>
-                </div>
-            </div>
-            <div id="ai-result-content" class="ai-result"></div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="text-center mt-16 text-xs text-slate-600">
-        Heap Dump Analyzer &middot; Spring Boot + Eclipse MAT + Spring AI
-    </footer>
-</div>
-
-<script>
-    // ========================== State ==========================
-    let currentAnalysisId = null;
-    let pollInterval = null;
-
-    // ========================== DOM ==========================
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const uploadProgress = document.getElementById('upload-progress');
-    const uploadBar = document.getElementById('upload-bar');
-    const uploadPercent = document.getElementById('upload-percent');
-    const uploadFileName = document.getElementById('upload-file-name');
-    const uploadSize = document.getElementById('upload-size');
-    const uploadSection = document.getElementById('upload-section');
-    const statusSection = document.getElementById('status-section');
-    const pipelineSteps = document.getElementById('pipeline-steps');
-    const errorSection = document.getElementById('error-section');
-    const errorMessage = document.getElementById('error-message');
-    const staticReportSection = document.getElementById('static-report-section');
-    const staticReportContent = document.getElementById('static-report-content');
-    const resultsSection = document.getElementById('results-section');
-    const aiResultContent = document.getElementById('ai-result-content');
-
-    // ========================== Pipeline Config ==========================
-    const STEPS = [
-        { key: 'UPLOADING',      label: 'Uploading File',        icon: '📤' },
-        { key: 'ANALYZING',      label: 'Running Eclipse MAT',   icon: '🔬' },
-        { key: 'AI_PROCESSING',  label: 'AI Analysis (GPT-4o)',  icon: '🤖' },
-        { key: 'COMPLETED',      label: 'Analysis Complete',     icon: '✅' },
-    ];
-
-    function renderPipeline(currentStatus) {
-        const currentIdx = STEPS.findIndex(s => s.key === currentStatus);
-        pipelineSteps.innerHTML = STEPS.map((step, i) => {
-            let stateClass = '';
-            let dotClass = '';
-            let connectorClass = '';
-
-            if (i < currentIdx || currentStatus === 'COMPLETED') {
-                stateClass = 'text-emerald-400';
-                dotClass = 'bg-emerald-400';
-                connectorClass = 'bg-emerald-400/40';
-            } else if (i === currentIdx && currentStatus !== 'COMPLETED') {
-                stateClass = 'text-indigo-400';
-                dotClass = 'bg-indigo-400 pulse-dot';
-                connectorClass = 'bg-indigo-400/20';
-            } else {
-                stateClass = 'text-slate-600';
-                dotClass = 'bg-slate-700';
-                connectorClass = 'bg-slate-800';
-            }
-
-            const connector = i < STEPS.length - 1
-                ? `<div class="step-connector ${connectorClass} ml-[9px]"></div>` : '';
-
-            return `
-                <div class="flex items-center gap-4 ${stateClass}">
-                    <div class="w-5 h-5 rounded-full ${dotClass} flex items-center justify-center flex-shrink-0">
-                        ${i < currentIdx || currentStatus === 'COMPLETED' ? '<svg class="w-3 h-3 text-surface-900" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>' : ''}
-                    </div>
-                    <span class="text-sm font-medium">${step.icon} ${step.label}</span>
-                </div>
-                ${connector}
-            `;
-        }).join('');
-    }
-
-    // ========================== Upload ==========================
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
-
-    function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-    }
-
-    function handleFile(file) {
-        if (!file.name.endsWith('.hprof')) {
-            alert('Please select a .hprof file.');
-            return;
-        }
-
-        // Reset
-        errorSection.classList.add('hidden');
-        resultsSection.classList.add('hidden');
-        staticReportSection.classList.add('hidden');
-
-        // Show upload progress
-        uploadProgress.classList.remove('hidden');
-        uploadFileName.textContent = file.name;
-        uploadSize.textContent = formatBytes(file.size);
-        uploadBar.style.width = '0%';
-        uploadPercent.textContent = '0%';
-
-        // Show pipeline
-        statusSection.classList.remove('hidden');
-        renderPipeline('UPLOADING');
-
-        // Upload with progress via XHR
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/analysis/upload');
-
-        xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-                const pct = Math.round((e.loaded / e.total) * 100);
-                uploadBar.style.width = pct + '%';
-                uploadPercent.textContent = pct + '%';
-                uploadSize.textContent = `${formatBytes(e.loaded)} / ${formatBytes(e.total)}`;
-            }
-        });
-
-        xhr.addEventListener('load', () => {
-            uploadProgress.classList.add('hidden');
-            if (xhr.status === 200) {
-                const data = JSON.parse(xhr.responseText);
-                currentAnalysisId = data.analysisId;
-                renderPipeline('ANALYZING');
-                startPolling();
-            } else {
-                showError('Upload failed: ' + xhr.statusText);
-            }
-        });
-
-        xhr.addEventListener('error', () => {
-            uploadProgress.classList.add('hidden');
-            showError('Network error during upload.');
-        });
-
-        xhr.send(formData);
-    }
-
-    // ========================== Polling ==========================
-    function startPolling() {
-        if (pollInterval) clearInterval(pollInterval);
-        pollInterval = setInterval(pollStatus, 2000);
-    }
-
-    async function pollStatus() {
-        if (!currentAnalysisId) return;
-        try {
-            const res = await fetch(`/api/analysis/${currentAnalysisId}/status`);
-            if (!res.ok) throw new Error('Status fetch failed');
-            const data = await res.json();
-
-            renderPipeline(data.status);
-
-            if (data.status === 'COMPLETED') {
-                clearInterval(pollInterval);
-                if (data.staticReport) {
-                    staticReportContent.textContent = data.staticReport;
-                    staticReportSection.classList.remove('hidden');
-                }
-                if (data.aiResponse) {
-                    aiResultContent.innerHTML = marked.parse(data.aiResponse);
-                    resultsSection.classList.remove('hidden');
-                }
-            } else if (data.status === 'FAILED') {
-                clearInterval(pollInterval);
-                showError(data.errorMessage || 'Analysis failed for unknown reason.');
-                if (data.staticReport) {
-                    staticReportContent.textContent = data.staticReport;
-                    staticReportSection.classList.remove('hidden');
-                }
-            }
-        } catch (e) {
-            console.error('Polling error:', e);
-        }
-    }
-
-    function showError(msg) {
-        errorMessage.textContent = msg;
-        errorSection.classList.remove('hidden');
-        renderPipeline('FAILED');
-    }
-</script>
 </body>
 </html>

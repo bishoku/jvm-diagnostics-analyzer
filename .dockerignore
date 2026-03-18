@@ -1,7 +1,14 @@
 target/
 .git/
 .gitignore
+.env
+.env.*
+!.env.example
 *.md
 heap-dumps/
 .idea/
 *.iml
+*.hprof
+.mvn/
+mvnw
+mvnw.cmd

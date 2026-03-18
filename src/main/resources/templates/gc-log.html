@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>GC Log Analysis — JVM Diagnostics</title>
+    <meta name="description" content="Upload GC logs for AI-powered garbage collection analysis and JVM tuning recommendations"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* ========================== Yapı Kredi Design System ========================== */
+        :root {
+            --yk-blue: #004990;
+            --yk-blue-dark: #003366;
+            --yk-blue-light: #1a6bc4;
+            --yk-blue-hover: #005bb5;
+            --yk-red: #D9322D;
+            --yk-white: #FFFFFF;
+            --yk-bg-light: #F5F7FA;
+            --yk-bg-section: #EDF1F7;
+            --yk-text-primary: #282828;
+            --yk-text-secondary: #5a6a7a;
+            --yk-text-muted: #8b95a5;
+            --yk-border: #e0e6ed;
+            --yk-shadow: 0 2px 12px rgba(0, 73, 144, 0.08);
+            --yk-shadow-hover: 0 8px 30px rgba(0, 73, 144, 0.15);
+            --yk-radius: 12px;
+            --yk-radius-sm: 8px;
+            --yk-green: #059669;
+            --yk-green-light: #d1fae5;
+            --yk-red-light: #fee2e2;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--yk-bg-light);
+            color: var(--yk-text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        code, pre { font-family: 'Ubuntu Mono', monospace; }
+
+        /* ========================== Navigation ========================== */
+        .nav {
+            background: var(--yk-blue);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--yk-white);
+        }
+
+        .nav-brand-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--yk-white);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-brand-icon svg { width: 22px; height: 22px; color: var(--yk-blue); }
+
+        .nav-brand-text { font-size: 1.15rem; font-weight: 700; }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--yk-white);
+        }
+
+        /* ========================== Page Header ========================== */
+        .page-header {
+            background: linear-gradient(135deg, var(--yk-blue) 0%, var(--yk-blue-dark) 100%);
+            padding: 2.5rem 2rem;
+            color: var(--yk-white);
+        }
+
+        .page-header-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .page-header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-header p {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.95rem;
+        }
+
+        /* ========================== Main Container ========================== */
+        .main-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex-grow: 1;
+            width: 100%;
+        }
+
+        /* ========================== Drop Zone ========================== */
+        .drop-zone {
+            background: var(--yk-white);
+            border: 2px dashed var(--yk-border);
+            border-radius: var(--yk-radius);
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--yk-shadow);
+        }
+
+        .drop-zone:hover {
+            border-color: var(--yk-blue-light);
+            background: #f8faff;
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--yk-blue);
+            background: #eef3ff;
+            box-shadow: var(--yk-shadow-hover);
+        }
+
+        .drop-zone-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            background: var(--yk-bg-section);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .drop-zone-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--yk-blue);
+        }
+
+        .drop-zone h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+            color: var(--yk-text-primary);
+        }
+
+        .drop-zone p {
+            font-size: 0.85rem;
+            color: var(--yk-text-muted);
+        }
+
+        .drop-zone code {
+            background: #eef3ff;
+            color: var(--yk-blue);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        /* ========================== Upload Progress ========================== */
+        .upload-progress {
+            display: none;
+            margin-top: 1.5rem;
+            background: var(--yk-white);
+            border-radius: var(--yk-radius-sm);
+            padding: 1.25rem;
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-border);
+        }
+
+        .upload-progress.visible { display: block; }
+
+        .upload-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-info-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--yk-border);
+            border-top-color: var(--yk-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .upload-file-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--yk-text-primary);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .upload-percent {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--yk-blue);
+            font-family: 'Ubuntu Mono', monospace;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 6px;
+            background: var(--yk-bg-section);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--yk-blue), var(--yk-blue-light));
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .upload-size {
+            font-size: 0.75rem;
+            color: var(--yk-text-muted);
+            margin-top: 0.4rem;
+        }
+
+        /* ========================== Pipeline ========================== */
+        .pipeline-section {
+            display: none;
+            margin-top: 1.5rem;
+        }
+
+        .pipeline-section.visible { display: block; }
+
+        .pipeline-card {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            padding: 1.5rem;
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-border);
+        }
+
+        .pipeline-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--yk-text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .pipeline-steps { display: flex; flex-direction: column; gap: 4px; }
+
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 0;
+        }
+
+        .step-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .step-dot.pending { background: var(--yk-bg-section); border: 2px solid var(--yk-border); }
+        .step-dot.active { background: var(--yk-blue); border: 2px solid var(--yk-blue); animation: pulse 1.5s ease-in-out infinite; }
+        .step-dot.done { background: var(--yk-green); border: 2px solid var(--yk-green); }
+
+        .step-dot svg { width: 12px; height: 12px; color: var(--yk-white); }
+
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(0, 73, 144, 0.3); } 50% { box-shadow: 0 0 0 8px rgba(0, 73, 144, 0); } }
+
+        .step-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .step-label.pending { color: var(--yk-text-muted); }
+        .step-label.active { color: var(--yk-blue); font-weight: 600; }
+        .step-label.done { color: var(--yk-green); }
+
+        .step-connector {
+            width: 2px;
+            height: 16px;
+            margin-left: 9px;
+            transition: background 0.3s ease;
+        }
+
+        .step-connector.pending { background: var(--yk-border); }
+        .step-connector.active { background: rgba(0, 73, 144, 0.3); }
+        .step-connector.done { background: rgba(5, 150, 105, 0.4); }
+
+        /* ========================== Error ========================== */
+        .error-section {
+            display: none;
+            margin-top: 1.5rem;
+        }
+
+        .error-section.visible { display: block; }
+
+        .error-card {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            padding: 1.25rem;
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-red);
+            border-left: 4px solid var(--yk-red);
+        }
+
+        .error-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .error-header svg { width: 20px; height: 20px; color: var(--yk-red); }
+
+        .error-header h3 { font-size: 0.95rem; font-weight: 600; color: var(--yk-red); }
+
+        .error-message { font-size: 0.85rem; color: var(--yk-text-secondary); line-height: 1.5; }
+
+        /* ========================== Static Report ========================== */
+        .static-report-section {
+            display: none;
+            margin-top: 1.5rem;
+        }
+
+        .static-report-section.visible { display: block; }
+
+        .report-toggle {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-border);
+            overflow: hidden;
+        }
+
+        .report-toggle summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--yk-text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+            list-style: none;
+        }
+
+        .report-toggle summary::-webkit-details-marker { display: none; }
+
+        .report-toggle summary svg { width: 16px; height: 16px; color: var(--yk-blue); }
+
+        .report-toggle summary:hover { color: var(--yk-text-primary); }
+
+        .report-content {
+            padding: 0 1.25rem 1.25rem;
+            border-top: 1px solid var(--yk-border);
+        }
+
+        .report-content pre {
+            font-size: 0.75rem;
+            color: var(--yk-text-secondary);
+            white-space: pre-wrap;
+            margin-top: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--yk-bg-light);
+            padding: 1rem;
+            border-radius: var(--yk-radius-sm);
+        }
+
+        /* ========================== AI Results ========================== */
+        .results-section {
+            display: none;
+            margin-top: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .results-section.visible { display: block; animation: fadeIn 0.5s ease; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .results-card {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-border);
+            border-top: 4px solid var(--yk-green);
+            padding: 1.75rem;
+        }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--yk-border);
+        }
+
+        .results-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--yk-green), #34d399);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .results-icon svg { width: 22px; height: 22px; color: var(--yk-white); }
+
+        .results-title h2 { font-size: 1.15rem; font-weight: 700; color: var(--yk-text-primary); }
+        .results-title p { font-size: 0.75rem; color: var(--yk-text-muted); }
+
+        /* AI Result Markdown Styling */
+        .ai-result h1 { font-size: 1.4rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: var(--yk-text-primary); border-bottom: 2px solid var(--yk-bg-section); padding-bottom: 0.5rem; }
+        .ai-result h2 { font-size: 1.15rem; font-weight: 600; margin: 1.25rem 0 0.5rem; color: var(--yk-blue); }
+        .ai-result h3 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.5rem; color: var(--yk-text-secondary); }
+        .ai-result p { margin: 0.5rem 0; line-height: 1.7; color: var(--yk-text-primary); font-size: 0.9rem; }
+        .ai-result ul, .ai-result ol { margin: 0.5rem 0 0.5rem 1.5rem; color: var(--yk-text-primary); }
+        .ai-result li { margin: 0.3rem 0; line-height: 1.6; font-size: 0.9rem; }
+        .ai-result code { background: #eef3ff; color: var(--yk-blue); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+        .ai-result pre { background: #1e293b; border-radius: var(--yk-radius-sm); padding: 1rem; margin: 0.75rem 0; overflow-x: auto; border: 1px solid #334155; }
+        .ai-result pre code { background: none; padding: 0; color: #e2e8f0; font-size: 0.8rem; }
+        .ai-result strong { color: var(--yk-text-primary); font-weight: 600; }
+        .ai-result blockquote { border-left: 3px solid var(--yk-blue); padding-left: 1rem; margin: 0.75rem 0; color: var(--yk-text-secondary); background: var(--yk-bg-light); padding: 0.75rem 1rem; border-radius: 0 var(--yk-radius-sm) var(--yk-radius-sm) 0; }
+        .ai-result table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.85rem; }
+        .ai-result th { background: var(--yk-bg-section); padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; border: 1px solid var(--yk-border); }
+        .ai-result td { padding: 0.5rem 0.75rem; border: 1px solid var(--yk-border); }
+
+        /* ========================== Footer ========================== */
+        .footer {
+            margin-top: auto;
+            background: var(--yk-blue-dark);
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            padding: 1.5rem 2rem;
+            font-size: 0.8rem;
+        }
+
+        /* ========================== Responsive ========================== */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .page-header { padding: 1.5rem 1rem; }
+            .main-container { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav">
+    <a href="/" class="nav-brand">
+        <div class="nav-brand-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        <span class="nav-brand-text">JVM Diagnostics</span>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/heap">Heap Dump</a></li>
+        <li><a href="/thread-dump">Thread Dump</a></li>
+        <li><a href="/gc-log" class="active">GC Log</a></li>
+    </ul>
+</nav>
+
+<!-- Page Header -->
+<section class="page-header">
+    <div class="page-header-content">
+        <h1>
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+            </svg>
+            GC Log Analysis
+        </h1>
+        <p>Upload your GC log for AI-powered garbage collection performance analysis and tuning</p>
+    </div>
+</section>
+
+<div class="main-container">
+
+    <!-- Drop Zone -->
+    <div id="drop-zone" class="drop-zone">
+        <div class="drop-zone-icon">
+            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+            </svg>
+        </div>
+        <h3>Drag &amp; drop your GC log here</h3>
+        <p>or click to browse — supports <code>.log</code>, <code>.txt</code> GC log files</p>
+        <input type="file" id="file-input" accept=".log,.txt,.gc" style="display: none;"/>
+    </div>
+
+    <!-- Upload Progress -->
+    <div id="upload-progress" class="upload-progress">
+        <div class="upload-info">
+            <div class="upload-info-left">
+                <div class="spinner"></div>
+                <span id="upload-file-name" class="upload-file-name"></span>
+            </div>
+            <span id="upload-percent" class="upload-percent">0%</span>
+        </div>
+        <div class="progress-track">
+            <div id="upload-bar" class="progress-bar"></div>
+        </div>
+        <p id="upload-size" class="upload-size"></p>
+    </div>
+
+    <!-- Pipeline Status -->
+    <div id="pipeline-section" class="pipeline-section">
+        <div class="pipeline-card">
+            <div class="pipeline-title">Analysis Pipeline</div>
+            <div id="pipeline-steps" class="pipeline-steps"></div>
+        </div>
+    </div>
+
+    <!-- Error -->
+    <div id="error-section" class="error-section">
+        <div class="error-card">
+            <div class="error-header">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                </svg>
+                <h3>Analysis Failed</h3>
+            </div>
+            <p id="error-message" class="error-message"></p>
+        </div>
+    </div>
+
+    <!-- Static Report -->
+    <div id="static-report-section" class="static-report-section">
+        <details class="report-toggle">
+            <summary>
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                </svg>
+                Parsed GC Log Report
+            </summary>
+            <div class="report-content">
+                <pre id="static-report-content"></pre>
+            </div>
+        </details>
+    </div>
+
+    <!-- AI Results -->
+    <div id="results-section" class="results-section">
+        <div class="results-card">
+            <div class="results-header">
+                <div class="results-icon">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                    </svg>
+                </div>
+                <div class="results-title">
+                    <h2>AI Analysis</h2>
+                    <p>Generated by AI · GC Performance & Tuning</p>
+                </div>
+            </div>
+            <div id="ai-result-content" class="ai-result"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+    JVM Diagnostics Analyzer &middot; Spring Boot + Eclipse MAT + Spring AI
+</footer>
+
+<script>
+    // ========================== State ==========================
+    const CONFIG = {
+        uploadUrl: '/api/gc-log/upload',
+        acceptExt: '.log,.txt,.gc',
+        validateExt: (name) => true,
+        extError: 'Please select a valid GC log file.',
+        steps: [
+            { key: 'UPLOADING',      label: 'Uploading File',           icon: '📤' },
+            { key: 'ANALYZING',      label: 'Parsing GC Log',          icon: '📊' },
+            { key: 'AI_PROCESSING',  label: 'AI Analysis',             icon: '🤖' },
+            { key: 'COMPLETED',      label: 'Analysis Complete',       icon: '✅' },
+        ],
+        staticReportLabel: 'Static Analysis Report (Eclipse MAT)',
+    };
+
+    let currentAnalysisId = null;
+    let pollInterval = null;
+
+    // ========================== DOM ==========================
+    const $ = (id) => document.getElementById(id);
+    const dropZone = $('drop-zone');
+    const fileInput = $('file-input');
+    const uploadProgress = $('upload-progress');
+    const uploadBar = $('upload-bar');
+    const uploadPercent = $('upload-percent');
+    const uploadFileName = $('upload-file-name');
+    const uploadSize = $('upload-size');
+    const pipelineSection = $('pipeline-section');
+    const pipelineSteps = $('pipeline-steps');
+    const errorSection = $('error-section');
+    const errorMessage = $('error-message');
+    const staticReportSection = $('static-report-section');
+    const staticReportContent = $('static-report-content');
+    const resultsSection = $('results-section');
+    const aiResultContent = $('ai-result-content');
+
+    // ========================== Pipeline Rendering ==========================
+    function renderPipeline(currentStatus) {
+        const currentIdx = CONFIG.steps.findIndex(s => s.key === currentStatus);
+        pipelineSteps.innerHTML = CONFIG.steps.map((step, i) => {
+            let dotState, labelState, connState;
+            if (i < currentIdx || currentStatus === 'COMPLETED') {
+                dotState = 'done'; labelState = 'done'; connState = 'done';
+            } else if (i === currentIdx && currentStatus !== 'COMPLETED') {
+                dotState = 'active'; labelState = 'active'; connState = 'active';
+            } else {
+                dotState = 'pending'; labelState = 'pending'; connState = 'pending';
+            }
+
+            const checkSvg = '<svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
+            const connector = i < CONFIG.steps.length - 1
+                ? `<div class="step-connector ${connState}"></div>` : '';
+
+            return `
+                <div class="pipeline-step">
+                    <div class="step-dot ${dotState}">${dotState === 'done' ? checkSvg : ''}</div>
+                    <span class="step-label ${labelState}">${step.icon} ${step.label}</span>
+                </div>
+                ${connector}
+            `;
+        }).join('');
+    }
+
+    // ========================== Upload ==========================
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function handleFile(file) {
+        if (!CONFIG.validateExt(file.name)) {
+            alert(CONFIG.extError);
+            return;
+        }
+
+        // Reset
+        errorSection.classList.remove('visible');
+        resultsSection.classList.remove('visible');
+        staticReportSection.classList.remove('visible');
+
+        // Show upload progress
+        uploadProgress.classList.add('visible');
+        uploadFileName.textContent = file.name;
+        uploadSize.textContent = formatBytes(file.size);
+        uploadBar.style.width = '0%';
+        uploadPercent.textContent = '0%';
+
+        // Show pipeline
+        pipelineSection.classList.add('visible');
+        renderPipeline('UPLOADING');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', CONFIG.uploadUrl);
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                uploadBar.style.width = pct + '%';
+                uploadPercent.textContent = pct + '%';
+                uploadSize.textContent = `${formatBytes(e.loaded)} / ${formatBytes(e.total)}`;
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            uploadProgress.classList.remove('visible');
+            if (xhr.status === 200) {
+                const data = JSON.parse(xhr.responseText);
+                currentAnalysisId = data.analysisId;
+                renderPipeline('ANALYZING');
+                startPolling();
+            } else {
+                showError('Upload failed: ' + xhr.statusText);
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            uploadProgress.classList.remove('visible');
+            showError('Network error during upload.');
+        });
+
+        xhr.send(formData);
+    }
+
+    // ========================== Polling ==========================
+    function startPolling() {
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(pollStatus, 2000);
+    }
+
+    async function pollStatus() {
+        if (!currentAnalysisId) return;
+        try {
+            const res = await fetch(`/api/analysis/${currentAnalysisId}/status`);
+            if (!res.ok) throw new Error('Status fetch failed');
+            const data = await res.json();
+
+            renderPipeline(data.status);
+
+            if (data.status === 'COMPLETED') {
+                clearInterval(pollInterval);
+                if (data.staticReport) {
+                    staticReportContent.textContent = data.staticReport;
+                    staticReportSection.classList.add('visible');
+                }
+                if (data.aiResponse) {
+                    aiResultContent.innerHTML = marked.parse(data.aiResponse);
+                    resultsSection.classList.add('visible');
+                }
+            } else if (data.status === 'FAILED') {
+                clearInterval(pollInterval);
+                showError(data.errorMessage || 'Analysis failed.');
+                if (data.staticReport) {
+                    staticReportContent.textContent = data.staticReport;
+                    staticReportSection.classList.add('visible');
+                }
+            }
+        } catch (e) {
+            console.error('Polling error:', e);
+        }
+    }
+
+    function showError(msg) {
+        errorMessage.textContent = msg;
+        errorSection.classList.add('visible');
+        renderPipeline('FAILED');
+    }
+</script>
+</body>
+</html>

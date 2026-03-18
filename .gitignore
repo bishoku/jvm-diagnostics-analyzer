@@ -1,4 +1,32 @@
-target
-.mvn
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data
+heap-dumps/
+*.hprof
+*.log
+
+# Environment secrets
+.env
+
+# Maven wrapper (not used — use system Maven)
+.mvn/
 mvnw
 mvnw.cmd

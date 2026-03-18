@@ -1,33 +1,33 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   servlet:
     multipart:
-      max-file-size: 5GB
-      max-request-size: 5GB
-      file-size-threshold: 10MB
+      max-file-size: ${MAX_FILE_SIZE:5GB}
+      max-request-size: ${MAX_REQUEST_SIZE:5GB}
+      file-size-threshold: ${FILE_SIZE_THRESHOLD:10MB}
       resolve-lazily: true
 
   ai:
     openai:
       api-key: ${OPENROUTER_API_KEY:sk-placeholder}
-      base-url: https://openrouter.ai/api
+      base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
       chat:
         options:
-          model: openai/gpt-oss-120b
-          temperature: 0.3
+          model: ${AI_MODEL:openai/gpt-4o}
+          temperature: ${AI_TEMPERATURE:0.3}
 
   thymeleaf:
     cache: false
 
 app:
   storage:
-    location: ./heap-dumps
+    location: ${APP_STORAGE_LOCATION:./heap-dumps}
   mat:
     home: ${APP_MAT_HOME:/opt/mat}
-    timeout-minutes: 30
+    timeout-minutes: ${APP_MAT_TIMEOUT_MINUTES:30}
   async:
-    core-pool-size: 2
-    max-pool-size: 4
-    queue-capacity: 10
+    core-pool-size: ${ASYNC_CORE_POOL_SIZE:2}
+    max-pool-size: ${ASYNC_MAX_POOL_SIZE:4}
+    queue-capacity: ${ASYNC_QUEUE_CAPACITY:10}

@@ -2,6 +2,7 @@ package com.heapanalyzer.controller;
 
 import com.heapanalyzer.model.AnalysisState;
 import com.heapanalyzer.model.AnalysisStatus;
+import com.heapanalyzer.model.AnalysisType;
 import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.FileStorageService;
 import org.slf4j.Logger;
@@ -16,7 +17,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Handles the web UI and REST API for heap dump analysis.
+ * Handles the web UI and REST API for JVM diagnostic analysis
+ * (heap dumps, thread dumps, and GC logs).
  */
 @Controller
 public class AnalysisController {
@@ -32,69 +34,66 @@ public class AnalysisController {
         this.analysisService = analysisService;
     }
 
-    /**
-     * Serves the main UI page.
-     */
+    // ========================== Page Routes ==========================
+
+    /** Landing page with tool selection. */
     @GetMapping("/")
     public String index() {
         return "index";
     }
 
-    /**
-     * Accepts a heap dump file upload. Streams the file to disk,
-     * creates an analysis entry, and kicks off async processing.
-     * Returns the analysisId immediately so the frontend can poll for status.
-     */
-    @PostMapping("/api/analysis/upload")
-    @ResponseBody
-    public ResponseEntity<?> uploadHeapDump(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "No file provided."));
-        }
-
-        String analysisId = UUID.randomUUID().toString();
-        String fileName = file.getOriginalFilename() != null
-                ? file.getOriginalFilename()
-                : "unknown.hprof";
-
-        log.info("Received upload: {} ({} bytes), analysisId={}", fileName, file.getSize(), analysisId);
-
-        try {
-            // 1. Create the analysis tracking entry
-            AnalysisState state = analysisService.createAnalysis(analysisId, fileName);
-            state.setFileSizeBytes(file.getSize());
-
-            // 2. Stream file to disk
-            Path savedPath = fileStorageService.store(file, analysisId);
-
-            // 3. Mark as uploaded, kick off async analysis
-            state.setStatus(AnalysisStatus.ANALYZING);
-            analysisService.runAnalysis(analysisId, savedPath);
-
-            return ResponseEntity.ok(Map.of(
-                    "analysisId", analysisId,
-                    "fileName", fileName,
-                    "message", "Upload complete. Analysis started."
-            ));
-
-        } catch (Exception e) {
-            log.error("Upload failed for analysisId={}", analysisId, e);
-
-            // Mark as failed if we already created the entry
-            AnalysisState state = analysisService.getAnalysis(analysisId);
-            if (state != null) {
-                state.setStatus(AnalysisStatus.FAILED);
-                state.setErrorMessage("Upload failed: " + e.getMessage());
-            }
-
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Upload failed: " + e.getMessage()));
-        }
+    /** Heap dump analysis page. */
+    @GetMapping("/heap")
+    public String heapDump() {
+        return "heap";
     }
 
+    /** Thread dump analysis page. */
+    @GetMapping("/thread-dump")
+    public String threadDump() {
+        return "thread-dump";
+    }
+
+    /** GC log analysis page. */
+    @GetMapping("/gc-log")
+    public String gcLog() {
+        return "gc-log";
+    }
+
+    // ========================== Upload Endpoints ==========================
+
+    /** Upload a heap dump (.hprof) file for analysis. */
+    @PostMapping("/api/heap/upload")
+    @ResponseBody
+    public ResponseEntity<?> uploadHeapDump(@RequestParam("file") MultipartFile file) {
+        return handleUpload(file, AnalysisType.HEAP_DUMP, ".hprof", "unknown.hprof");
+    }
+
+    /** Upload a thread dump (.txt, .tdump, .log) file for analysis. */
+    @PostMapping("/api/thread-dump/upload")
+    @ResponseBody
+    public ResponseEntity<?> uploadThreadDump(@RequestParam("file") MultipartFile file) {
+        return handleUpload(file, AnalysisType.THREAD_DUMP, null, "thread-dump.txt");
+    }
+
+    /** Upload a GC log (.log, .txt) file for analysis. */
+    @PostMapping("/api/gc-log/upload")
+    @ResponseBody
+    public ResponseEntity<?> uploadGcLog(@RequestParam("file") MultipartFile file) {
+        return handleUpload(file, AnalysisType.GC_LOG, null, "gc.log");
+    }
+
+    /** Legacy endpoint — kept for backward compatibility. */
+    @PostMapping("/api/analysis/upload")
+    @ResponseBody
+    public ResponseEntity<?> uploadLegacy(@RequestParam("file") MultipartFile file) {
+        return uploadHeapDump(file);
+    }
+
+    // ========================== Status Endpoint ==========================
+
     /**
-     * Returns the current status and results of an analysis.
+     * Returns the current status and results of any analysis type.
      * The frontend polls this endpoint every ~2 seconds.
      */
     @GetMapping("/api/analysis/{id}/status")
@@ -108,6 +107,7 @@ public class AnalysisController {
         return ResponseEntity.ok(Map.of(
                 "id", state.getId(),
                 "fileName", state.getFileName(),
+                "analysisType", state.getAnalysisType().name(),
                 "status", state.getStatus().name(),
                 "staticReport", state.getStaticReport() != null ? state.getStaticReport() : "",
                 "aiResponse", state.getAiResponse() != null ? state.getAiResponse() : "",
@@ -115,5 +115,66 @@ public class AnalysisController {
                 "createdAt", state.getCreatedAt().toString(),
                 "fileSizeBytes", state.getFileSizeBytes()
         ));
+    }
+
+    // ========================== Internals ==========================
+
+    private ResponseEntity<?> handleUpload(MultipartFile file, AnalysisType type,
+                                           String requiredExtension, String defaultFilename) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "No file provided."));
+        }
+
+        String analysisId = UUID.randomUUID().toString();
+        String fileName = file.getOriginalFilename() != null
+                ? file.getOriginalFilename()
+                : defaultFilename;
+
+        // Validate file extension if required
+        if (requiredExtension != null && !fileName.toLowerCase().endsWith(requiredExtension)) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Expected a " + requiredExtension + " file."));
+        }
+
+        log.info("Received {} upload: {} ({} bytes), analysisId={}",
+                type, fileName, file.getSize(), analysisId);
+
+        try {
+            // 1. Create the analysis tracking entry
+            AnalysisState state = analysisService.createAnalysis(analysisId, fileName, type);
+            state.setFileSizeBytes(file.getSize());
+
+            // 2. Stream file to disk
+            Path savedPath = fileStorageService.store(file, analysisId);
+
+            // 3. Mark as analyzing, kick off async analysis
+            state.setStatus(AnalysisStatus.ANALYZING);
+
+            switch (type) {
+                case HEAP_DUMP -> analysisService.runHeapDumpAnalysis(analysisId, savedPath);
+                case THREAD_DUMP -> analysisService.runThreadDumpAnalysis(analysisId, savedPath);
+                case GC_LOG -> analysisService.runGcLogAnalysis(analysisId, savedPath);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "analysisId", analysisId,
+                    "fileName", fileName,
+                    "analysisType", type.name(),
+                    "message", "Upload complete. Analysis started."
+            ));
+
+        } catch (Exception e) {
+            log.error("Upload failed for analysisId={}", analysisId, e);
+
+            AnalysisState state = analysisService.getAnalysis(analysisId);
+            if (state != null) {
+                state.setStatus(AnalysisStatus.FAILED);
+                state.setErrorMessage("Upload failed: " + e.getMessage());
+            }
+
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Upload failed: " + e.getMessage()));
+        }
     }
 }

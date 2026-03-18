@@ -3,13 +3,14 @@ package com.heapanalyzer.model;
 import java.time.Instant;
 
 /**
- * Holds the full state of a single heap dump analysis job.
+ * Holds the full state of a single analysis job (heap dump, thread dump, or GC log).
  * This object is stored in the in-memory analysis registry.
  */
 public class AnalysisState {
 
     private final String id;
     private final String fileName;
+    private final AnalysisType analysisType;
     private volatile AnalysisStatus status;
     private volatile String staticReport;
     private volatile String aiResponse;
@@ -17,9 +18,10 @@ public class AnalysisState {
     private final Instant createdAt;
     private volatile long fileSizeBytes;
 
-    public AnalysisState(String id, String fileName) {
+    public AnalysisState(String id, String fileName, AnalysisType analysisType) {
         this.id = id;
         this.fileName = fileName;
+        this.analysisType = analysisType;
         this.status = AnalysisStatus.UPLOADING;
         this.createdAt = Instant.now();
     }
@@ -32,6 +34,10 @@ public class AnalysisState {
 
     public String getFileName() {
         return fileName;
+    }
+
+    public AnalysisType getAnalysisType() {
+        return analysisType;
     }
 
     public AnalysisStatus getStatus() {

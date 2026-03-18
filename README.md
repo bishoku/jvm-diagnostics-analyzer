@@ -1,18 +1,33 @@
-# 🔬 Heap Dump Analyzer
+# 🔬 JVM Diagnostics Analyzer
 
-A Spring Boot application that analyzes JVM heap dump (`.hprof`) files using **Eclipse MAT** for static analysis and **OpenAI GPT-4o** (via [OpenRouter](https://openrouter.ai)) for AI-powered, actionable memory leak insights.
+AI-powered JVM diagnostics tool — analyze **heap dumps**, **thread dumps**, and **GC logs** with actionable insights from GPT-4o.
 
-![Java 21](https://img.shields.io/badge/Java-21-blue) ![Spring Boot 3.4](https://img.shields.io/badge/Spring%20Boot-3.4-green) ![Spring AI](https://img.shields.io/badge/Spring%20AI-OpenRouter-purple)
+Built with **Spring Boot 4**, **Java 25**, **Eclipse MAT**, and **Spring AI**.
+
+![Java 25](https://img.shields.io/badge/Java-25-blue) ![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0-green) ![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1-purple) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
 
 ## Features
 
-- **Large file support** — Streams uploads (up to 5 GB) directly to disk; no in-memory buffering
-- **Real Eclipse MAT analysis** — Runs `ParseHeapDump.sh` headlessly to produce Leak Suspects, System Overview, and Top Components reports
-- **AI-powered insights** — Sends the MAT report to GPT-4o for root-cause analysis and code-level fix recommendations
-- **Async pipeline** — Upload, MAT analysis, and AI generation run asynchronously with live status polling
-- **Modern UI** — Dark-themed Tailwind CSS interface with drag-and-drop upload, progress tracking, and markdown-rendered results
+### 🔬 Heap Dump Analysis
+- **Eclipse MAT integration** — Runs `ParseHeapDump.sh` headlessly to produce Leak Suspects reports
+- **AI-powered insights** — GPT-4o interprets MAT reports for root-cause analysis and code-level fixes
+- **Large file support** — Streams uploads up to 5 GB directly to disk
+
+### 🧵 Thread Dump Analysis
+- **Thread state parsing** — Extracts RUNNABLE, WAITING, BLOCKED, TIMED_WAITING distributions
+- **Deadlock detection** — Automatically detects Java-level deadlocks
+- **AI concurrency analysis** — Identifies contention bottlenecks and suggests concurrency fixes
+
+### 📊 GC Log Analysis
+- **Multi-collector support** — G1GC, ZGC, Shenandoah, CMS, Parallel, Serial
+- **Pause time percentiles** — P50, P95, P99 analysis with anomaly detection
+- **AI tuning recommendations** — Specific JVM flag suggestions and heap sizing advice
+
+### Common
+- **Async pipeline** — Upload, analysis, and AI generation run asynchronously with live status polling
+- **Modern UI** — Professional enterprise-grade design
 
 ---
 
@@ -20,36 +35,81 @@ A Spring Boot application that analyzes JVM heap dump (`.hprof`) files using **E
 
 | Requirement | Details |
 |---|---|
-| **Java 21** | Required for local builds |
-| **Docker** | Required for the recommended Docker-based setup |
+| **Java 25** | Required for local builds |
+| **Docker** | Required for the Docker-based setup |
 | **OpenRouter API Key** | Get one at [openrouter.ai/keys](https://openrouter.ai/keys) |
 
 ---
 
-## Quick Start (Docker — Recommended)
+## Quick Start with Docker (Recommended)
 
 Docker is the easiest way to run the app because the image **bundles Eclipse MAT** automatically.
 
+### Using Docker Compose
+
 ```bash
 # 1. Clone the project
-cd heap-dump-analyze
+git clone https://github.com/your-username/jvm-diagnostics-analyzer.git
+cd jvm-diagnostics-analyzer
 
-# 2. Set your OpenRouter API key
-export OPENROUTER_API_KEY=sk-or-your-key-here
+# 2. Configure your API key
+cp .env.example .env
+# Edit .env and set OPENROUTER_API_KEY=sk-or-your-key-here
 
-# 3. Build and run
+# 3. Start the application
 docker compose up --build
 ```
 
 Open **http://localhost:8080** in your browser.
 
+### Using Docker Run
+
+```bash
+docker build -t jvm-diagnostics .
+
+docker run -d \
+  --name jvm-diagnostics \
+  -p 8080:8080 \
+  -e OPENROUTER_API_KEY=sk-or-your-key-here \
+  -v jvm-uploads:/data/uploads \
+  jvm-diagnostics
+```
+
+### Building Multi-Platform Images
+
+```bash
+# Build for both amd64 and arm64 (e.g., for Docker Hub)
+docker buildx create --use
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t your-username/jvm-diagnostics:latest \
+  --push .
+```
+
+### Docker Environment Variables
+
+All settings can be overridden via environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENROUTER_API_KEY` | **(required)** | Your OpenRouter API key |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api` | AI provider base URL |
+| `AI_MODEL` | `openai/gpt-4o` | AI model to use |
+| `AI_TEMPERATURE` | `0.3` | Response temperature |
+| `MAX_FILE_SIZE` | `5GB` | Max upload file size |
+| `MAX_REQUEST_SIZE` | `5GB` | Max HTTP request size |
+| `FILE_SIZE_THRESHOLD` | `10MB` | Threshold before writing to disk |
+| `APP_MAT_TIMEOUT_MINUTES` | `30` | Max time for MAT analysis |
+| `JAVA_OPTS` | `-Xms512m -Xmx2g` | JVM options for the app |
+| `SERVER_PORT` | `8080` | Application port |
+
 ---
 
 ## Running Locally (Without Docker)
 
-If you prefer running outside Docker, you need Eclipse MAT installed on your machine.
+If you prefer running outside Docker, you need Eclipse MAT installed for heap dump analysis. Thread dump and GC log analysis work without MAT.
 
-### 1. Install Eclipse MAT
+### 1. Install Eclipse MAT (for heap dump analysis only)
 
 Download the **standalone** version from [eclipse.org/mat](https://eclipse.dev/mat/downloads.php) and unzip it.
 
@@ -63,7 +123,7 @@ export OPENROUTER_API_KEY=sk-or-your-key-here
 ### 3. Build and Run
 
 ```bash
-./mvnw spring-boot:run
+mvn spring-boot:run
 ```
 
 Open **http://localhost:8080**.
@@ -72,29 +132,26 @@ Open **http://localhost:8080**.
 
 ## Usage
 
-1. **Upload** — Drag and drop (or browse) a `.hprof` file on the landing page
-2. **Wait** — The UI shows a live pipeline:
-   - 📤 **Uploading** — File streams to disk
-   - 🔬 **Eclipse MAT** — Static analysis runs (~1–10 min depending on dump size)
-   - 🤖 **AI Analysis** — GPT-4o interprets the MAT report
-   - ✅ **Done** — Results appear
-3. **Review** — Expand the raw MAT report or read the AI's markdown-formatted recommendations
+### Heap Dump Analysis
 
----
+1. Navigate to **Heap Dump** from the landing page
+2. Upload a `.hprof` file
+3. Wait for Eclipse MAT analysis + AI insights
+4. Review memory leak root causes and code-level fixes
 
-## Configuration
+### Thread Dump Analysis
 
-All settings are in `src/main/resources/application.yml` and can be overridden via environment variables:
+1. Navigate to **Thread Dump** from the landing page
+2. Upload a thread dump file (`.txt`, `.tdump`, `.log`) captured via `jstack` or `jcmd`
+3. Wait for thread state parsing + AI analysis
+4. Review deadlock detection, contention analysis, and concurrency recommendations
 
-| Property | Env Variable | Default | Description |
-|---|---|---|---|
-| `app.storage.location` | `APP_STORAGE_LOCATION` | `./heap-dumps` | Directory for uploaded files |
-| `app.mat.home` | `APP_MAT_HOME` | `/opt/mat` | Path to Eclipse MAT installation |
-| `app.mat.timeout-minutes` | — | `30` | Max time for MAT analysis |
-| `spring.ai.openai.api-key` | `OPENROUTER_API_KEY` | — | Your OpenRouter API key |
-| `spring.ai.openai.base-url` | — | `https://openrouter.ai/api/v1` | OpenRouter endpoint |
-| `spring.ai.openai.chat.options.model` | — | `openai/gpt-4o` | Model to use (any [OpenRouter model](https://openrouter.ai/models)) |
-| `spring.servlet.multipart.max-file-size` | — | `5GB` | Max upload size |
+### GC Log Analysis
+
+1. Navigate to **GC Log** from the landing page
+2. Upload a GC log file (`.log`, `.txt`) from any JVM collector
+3. Wait for pause time analysis + AI insights
+4. Review GC tuning recommendations and heap sizing advice
 
 ---
 
@@ -102,19 +159,28 @@ All settings are in `src/main/resources/application.yml` and can be overridden v
 
 ```
 src/main/java/com/heapanalyzer/
-├── HeapDumpAnalyzerApplication.java   # Entry point
+├── HeapDumpAnalyzerApplication.java        # Entry point
 ├── config/
-│   └── AsyncConfig.java               # Thread pool for async analysis
+│   └── AsyncConfig.java                    # Thread pool for async analysis
 ├── controller/
-│   └── AnalysisController.java        # REST API + UI route
+│   └── AnalysisController.java             # REST API + UI routes
 ├── model/
-│   ├── AnalysisState.java             # Per-job state holder
-│   └── AnalysisStatus.java            # Lifecycle enum
+│   ├── AnalysisState.java                  # Per-job state holder
+│   ├── AnalysisStatus.java                 # Lifecycle enum
+│   └── AnalysisType.java                   # HEAP_DUMP | THREAD_DUMP | GC_LOG
 └── service/
-    ├── AnalysisService.java           # Async pipeline orchestrator
-    ├── FileStorageService.java        # Stream-to-disk uploads
-    ├── MatAnalysisService.java        # Eclipse MAT subprocess
-    └── SpringAiService.java           # OpenAI via Spring AI
+    ├── AnalysisService.java                # Async pipeline orchestrator
+    ├── FileStorageService.java             # Stream-to-disk uploads
+    ├── GcLogAnalysisService.java           # GC log parser
+    ├── MatAnalysisService.java             # Eclipse MAT subprocess
+    ├── SpringAiService.java                # OpenAI via Spring AI
+    └── ThreadDumpAnalysisService.java      # Thread dump parser
+
+src/main/resources/templates/
+├── index.html                              # Landing page (tool selection)
+├── heap.html                               # Heap dump upload & results
+├── thread-dump.html                        # Thread dump upload & results
+└── gc-log.html                             # GC log upload & results
 ```
 
 ---
@@ -123,82 +189,83 @@ src/main/java/com/heapanalyzer/
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/` | Web UI |
-| `POST` | `/api/analysis/upload` | Upload `.hprof` file (multipart) → returns `{ analysisId }` |
-| `GET` | `/api/analysis/{id}/status` | Poll analysis state and results |
+| `GET` | `/` | Landing page |
+| `GET` | `/heap` | Heap dump analysis page |
+| `GET` | `/thread-dump` | Thread dump analysis page |
+| `GET` | `/gc-log` | GC log analysis page |
+| `POST` | `/api/heap/upload` | Upload `.hprof` file |
+| `POST` | `/api/thread-dump/upload` | Upload thread dump |
+| `POST` | `/api/gc-log/upload` | Upload GC log |
+| `GET` | `/api/analysis/{id}/status` | Poll analysis status and results |
 
 ---
 
-## Docker Notes
+## How to Capture Diagnostic Files
 
-The `Dockerfile` uses a multi-stage build:
-
-1. **Builder stage** — Compiles the Spring Boot fat JAR with Maven
-2. **Runtime stage** — Eclipse Temurin JDK 21 + Eclipse MAT standalone
-
-Eclipse MAT inside the container is configured with `-Xmx4g` by default. For very large dumps (>3 GB), you may need to increase this in the Dockerfile and allocate more memory to the container:
+### Heap Dump (.hprof)
 
 ```bash
-docker compose up --build -d
-docker update --memory=8g heap-dump-analyze-heap-analyzer-1
-```
-
----
-
-## How to Capture a Heap Dump
-
-You need a `.hprof` file to use this tool. Here are the most common ways to get one from a running Java application.
-
-### Using `jmap` (JDK tool)
-
-```bash
-# Find the PID of your Java process
-jps -l
-
-# Capture a heap dump (replace <PID>)
-jmap -dump:format=b,file=heapdump.hprof <PID>
-```
-
-### Using `jcmd` (recommended, JDK 8+)
-
-```bash
+# Using jcmd (recommended)
 jcmd <PID> GC.heap_dump /path/to/heapdump.hprof
+
+# Using jmap
+jmap -dump:format=b,file=heapdump.hprof <PID>
+
+# Automatic on OOM
+java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path/to/dumps/ -jar your-app.jar
 ```
 
-### Automatic Dump on OutOfMemoryError
-
-Add these JVM flags when starting your application to automatically generate a heap dump when OOM occurs:
+### Thread Dump
 
 ```bash
-java -XX:+HeapDumpOnOutOfMemoryError \
-     -XX:HeapDumpPath=/path/to/dumps/ \
-     -jar your-app.jar
+# Using jstack
+jstack <PID> > thread-dump.txt
+
+# Using jcmd
+jcmd <PID> Thread.print > thread-dump.txt
+
+# Using kill signal (Unix)
+kill -3 <PID>
 ```
 
-### From a Docker Container
+### GC Log
 
 ```bash
-# Find the Java PID inside the container (usually 1)
+# JDK 9+ (Unified Logging)
+java -Xlog:gc*:file=gc.log:time,uptime,level,tags -jar your-app.jar
+
+# JDK 8
+java -verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -jar your-app.jar
+```
+
+### From Docker / Kubernetes
+
+```bash
+# Docker
+docker exec <container> jstack 1 > thread-dump.txt
 docker exec <container> jcmd 1 GC.heap_dump /tmp/heapdump.hprof
-
-# Copy the dump to your host machine
 docker cp <container>:/tmp/heapdump.hprof ./heapdump.hprof
+
+# Kubernetes
+kubectl exec <pod> -- jstack 1 > thread-dump.txt
+kubectl exec <pod> -- jcmd 1 GC.heap_dump /tmp/heapdump.hprof
+kubectl cp <pod>:/tmp/heapdump.hprof ./heapdump.hprof
 ```
 
-### From Kubernetes
+---
 
-```bash
-# Exec into the pod and dump
-kubectl exec <pod-name> -- jcmd 1 GC.heap_dump /tmp/heapdump.hprof
+## Tech Stack
 
-# Copy to local machine
-kubectl cp <pod-name>:/tmp/heapdump.hprof ./heapdump.hprof
-```
-
-> **Tip:** Heap dumps capture the full contents of JVM memory, so the `.hprof` file will be roughly the same size as your `-Xmx` heap setting. Make sure you have enough disk space.
+| Technology | Version | Purpose |
+|---|---|---|
+| Java | 25 | Runtime |
+| Spring Boot | 4.0.3 | Application framework |
+| Spring AI | 1.1.2 | AI integration (OpenAI) |
+| Eclipse MAT | 1.16.1 | Heap dump analysis |
+| Thymeleaf | — | Server-side templating |
 
 ---
 
 ## License
 
-MIT
+[MIT](LICENSE)
