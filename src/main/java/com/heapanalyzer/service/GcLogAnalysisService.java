@@ -148,12 +148,18 @@ public class GcLogAnalysisService {
         // Pause Time Analysis
         if (!pauseTimes.isEmpty()) {
             report.append("## Pause Time Analysis\n\n");
-            double totalPause = pauseTimes.stream().mapToDouble(d -> d).sum();
-            double avgPause = totalPause / pauseTimes.size();
-            double maxPause = pauseTimes.stream().mapToDouble(d -> d).max().orElse(0);
-            double minPause = pauseTimes.stream().mapToDouble(d -> d).min().orElse(0);
-            long above200ms = pauseTimes.stream().filter(p -> p > 200).count();
-            long above1000ms = pauseTimes.stream().filter(p -> p > 1000).count();
+            java.util.DoubleSummaryStatistics stats = pauseTimes.stream().mapToDouble(d -> d).summaryStatistics();
+            double totalPause = stats.getSum();
+            double avgPause = stats.getAverage();
+            double maxPause = stats.getMax();
+            double minPause = stats.getMin();
+
+            long above200ms = 0;
+            long above1000ms = 0;
+            for (Double p : pauseTimes) {
+                if (p > 200) above200ms++;
+                if (p > 1000) above1000ms++;
+            }
 
             // Sort for percentile calculation
             List<Double> sorted = new ArrayList<>(pauseTimes);
