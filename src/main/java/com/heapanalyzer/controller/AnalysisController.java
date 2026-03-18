@@ -16,6 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.ai.retry.TransientAiException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
@@ -182,7 +185,7 @@ public class AnalysisController {
                     "message", "Connection successful!",
                     "response", response != null ? response.substring(0, Math.min(100, response.length())) : ""
             ));
-        } catch (Exception e) {
+        } catch (IllegalStateException | RestClientException | NonTransientAiException | TransientAiException e) {
             return ResponseEntity.ok(Map.of(
                     "status", "error",
                     "message", "Connection failed: " + e.getMessage()
