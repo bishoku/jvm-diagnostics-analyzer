@@ -53,6 +53,13 @@ public class FileStorageService {
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isBlank()) {
             originalFilename = "heap-dump.hprof";
+        } else {
+            Path fileNamePath = Paths.get(originalFilename).getFileName();
+            if (fileNamePath == null) {
+                originalFilename = "heap-dump.hprof";
+            } else {
+                originalFilename = fileNamePath.toString();
+            }
         }
 
         Path targetPath = targetDir.resolve(originalFilename);
