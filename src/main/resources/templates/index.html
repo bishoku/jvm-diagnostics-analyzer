@@ -340,6 +340,124 @@
             color: var(--yk-white);
         }
 
+        /* ========================== History Table ========================== */
+        .history-section {
+            max-width: 1100px;
+            margin: 0 auto 3rem;
+            padding: 0 2rem;
+        }
+
+        .history-container {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            box-shadow: var(--yk-shadow);
+            border: 1px solid var(--yk-border);
+            overflow: hidden;
+        }
+
+        .history-header {
+            padding: 1.5rem 2rem 1rem;
+        }
+
+        .history-header h2 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--yk-text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .history-subtitle {
+            font-size: 0.875rem;
+            color: var(--yk-text-muted);
+        }
+
+        .history-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table thead th {
+            text-align: left;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--yk-text-muted);
+            border-top: 1px solid var(--yk-border);
+            border-bottom: 1px solid var(--yk-border);
+            background: var(--yk-bg-light);
+        }
+
+        .history-table tbody tr {
+            border-bottom: 1px solid var(--yk-border);
+            transition: background 0.15s ease;
+        }
+
+        .history-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .history-table tbody tr:hover {
+            background: var(--yk-bg-light);
+        }
+
+        .history-table td {
+            padding: 0.875rem 1.5rem;
+            font-size: 0.875rem;
+            color: var(--yk-text-primary);
+        }
+
+        .file-name {
+            font-family: 'Ubuntu Mono', monospace;
+            font-weight: 500;
+        }
+
+        .date-cell {
+            color: var(--yk-text-muted);
+            font-size: 0.8rem;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .badge-heap { background: #e8f0fe; color: #004990; }
+        .badge-thread { background: #f3e8ff; color: #7c3aed; }
+        .badge-gc { background: #ecfdf5; color: #059669; }
+
+        .status-pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #ecfdf5;
+            color: #059669;
+        }
+
+        .view-link {
+            color: var(--yk-blue);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+
+        .view-link:hover {
+            color: var(--yk-blue-hover);
+        }
+
         /* ========================== Responsive ========================== */
         @media (max-width: 768px) {
             .hero h1 { font-size: 2rem; }
@@ -442,6 +560,48 @@
             </div>
         </a>
 
+    </div>
+</section>
+
+<!-- History Table (shown if there are saved records) -->
+<section class="history-section" th:if="${not #lists.isEmpty(history)}">
+    <div class="history-container">
+        <div class="history-header">
+            <h2>📋 Analysis History</h2>
+            <p class="history-subtitle">Previously saved analysis results</p>
+        </div>
+        <div class="history-table-wrapper">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>File Name</th>
+                        <th>Status</th>
+                        <th>Saved</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="record : ${history}">
+                        <td>
+                            <span class="type-badge" th:classappend="${record.analysisType.name() == 'HEAP_DUMP'} ? 'badge-heap' : (${record.analysisType.name() == 'THREAD_DUMP'} ? 'badge-thread' : 'badge-gc')"
+                                  th:text="${record.analysisType.name() == 'HEAP_DUMP'} ? 'Heap Dump' : (${record.analysisType.name() == 'THREAD_DUMP'} ? 'Thread Dump' : 'GC Log')">
+                            </span>
+                        </td>
+                        <td class="file-name" th:text="${record.fileName}">file.hprof</td>
+                        <td>
+                            <span class="status-pill" th:text="${record.status}">COMPLETED</span>
+                        </td>
+                        <td class="date-cell" th:text="${#strings.substring(record.savedAt, 0, 10)}">2025-01-01</td>
+                        <td>
+                            <a class="view-link" th:href="@{'/history/' + ${record.id}}">
+                                View →
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
 

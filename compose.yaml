@@ -20,6 +20,7 @@ services:
       # Storage & MAT (optional — Docker defaults are fine)
       - APP_STORAGE_LOCATION=/data/uploads
       - APP_MAT_HOME=/opt/mat
+      - MAT_HEAP_SIZE=${MAT_HEAP_SIZE:-4g}
       - APP_MAT_TIMEOUT_MINUTES=${APP_MAT_TIMEOUT_MINUTES:-30}
 
       # JVM tuning (optional)

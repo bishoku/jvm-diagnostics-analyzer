@@ -53,9 +53,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     rm -rf /tmp/mat.zip /opt/mat-tmp && \
     chmod +x /opt/mat/ParseHeapDump.sh
 
-# Increase MAT's own heap for analyzing large dumps
-RUN echo '-Xmx4g' >> /opt/mat/MemoryAnalyzer.ini
-
 WORKDIR /app
 
 # Copy the built JAR
@@ -69,8 +66,10 @@ VOLUME /data/uploads
 # These can all be overridden at runtime via docker-compose or docker run -e
 ENV APP_STORAGE_LOCATION=/data/uploads
 ENV APP_MAT_HOME=/opt/mat
+ENV MAT_HEAP_SIZE=4g
 ENV JAVA_OPTS="-Xms512m -Xmx2g"
 
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Configure MAT heap at runtime (so MAT_HEAP_SIZE can be overridden), then start the app
+ENTRYPOINT ["sh", "-c", "sed -i '/-Xmx/d' /opt/mat/MemoryAnalyzer.ini && echo \"-Xmx${MAT_HEAP_SIZE}\" >> /opt/mat/MemoryAnalyzer.ini && java $JAVA_OPTS -jar app.jar"]

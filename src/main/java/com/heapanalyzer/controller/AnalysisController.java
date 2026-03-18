@@ -1,14 +1,17 @@
 package com.heapanalyzer.controller;
 
+import com.heapanalyzer.model.AnalysisRecord;
 import com.heapanalyzer.model.AnalysisState;
 import com.heapanalyzer.model.AnalysisStatus;
 import com.heapanalyzer.model.AnalysisType;
+import com.heapanalyzer.service.AnalysisHistoryService;
 import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,18 +30,22 @@ public class AnalysisController {
 
     private final FileStorageService fileStorageService;
     private final AnalysisService analysisService;
+    private final AnalysisHistoryService historyService;
 
     public AnalysisController(FileStorageService fileStorageService,
-                              AnalysisService analysisService) {
+                              AnalysisService analysisService,
+                              AnalysisHistoryService historyService) {
         this.fileStorageService = fileStorageService;
         this.analysisService = analysisService;
+        this.historyService = historyService;
     }
 
     // ========================== Page Routes ==========================
 
-    /** Landing page with tool selection. */
+    /** Landing page with tool selection + history table. */
     @GetMapping("/")
-    public String index() {
+    public String index(Model model) {
+        model.addAttribute("history", historyService.listAll());
         return "index";
     }
 
@@ -58,6 +65,24 @@ public class AnalysisController {
     @GetMapping("/gc-log")
     public String gcLog() {
         return "gc-log";
+    }
+
+    /** View a saved analysis result. */
+    @GetMapping("/history/{id}")
+    public String viewSavedResult(@PathVariable("id") String id, Model model) {
+        var record = historyService.findById(id);
+        if (record.isEmpty()) {
+            return "redirect:/";
+        }
+        AnalysisRecord r = record.get();
+        model.addAttribute("record", r);
+
+        // Route to the correct template based on analysis type
+        return switch (r.getAnalysisType()) {
+            case HEAP_DUMP -> "heap";
+            case THREAD_DUMP -> "thread-dump";
+            case GC_LOG -> "gc-log";
+        };
     }
 
     // ========================== Upload Endpoints ==========================
@@ -115,6 +140,56 @@ public class AnalysisController {
                 "createdAt", state.getCreatedAt().toString(),
                 "fileSizeBytes", state.getFileSizeBytes()
         ));
+    }
+
+    // ========================== History Endpoints ==========================
+
+    /** Save a completed analysis to persistent history. */
+    @PostMapping("/api/analysis/{id}/save")
+    @ResponseBody
+    public ResponseEntity<?> saveAnalysis(@PathVariable("id") String id) {
+        AnalysisState state = analysisService.getAnalysis(id);
+        if (state == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (state.getStatus() != AnalysisStatus.COMPLETED) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Can only save completed analyses."));
+        }
+
+        AnalysisRecord record = AnalysisRecord.from(state);
+        historyService.save(record);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Analysis saved successfully.",
+                "id", record.getId()
+        ));
+    }
+
+    /** List all saved analysis records. */
+    @GetMapping("/api/history")
+    @ResponseBody
+    public ResponseEntity<?> listHistory() {
+        return ResponseEntity.ok(historyService.listAll());
+    }
+
+    /** Get a single saved analysis record. */
+    @GetMapping("/api/history/{id}")
+    @ResponseBody
+    public ResponseEntity<?> getHistoryRecord(@PathVariable("id") String id) {
+        return historyService.findById(id)
+                .map(r -> ResponseEntity.ok((Object) r))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Delete a saved analysis record. */
+    @DeleteMapping("/api/history/{id}")
+    @ResponseBody
+    public ResponseEntity<?> deleteHistoryRecord(@PathVariable("id") String id) {
+        if (historyService.delete(id)) {
+            return ResponseEntity.ok(Map.of("message", "Record deleted."));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     // ========================== Internals ==========================

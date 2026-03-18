@@ -8,6 +8,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Orchestrates analysis pipelines for heap dumps, thread dumps, and GC logs.
  * All heavy work runs on a separate thread via @Async.
+ * Uploaded and generated files are cleaned up after analysis completes.
  */
 @Service
 public class AnalysisService {
@@ -93,6 +97,8 @@ public class AnalysisService {
             state.setStatus(AnalysisStatus.FAILED);
             state.setErrorMessage(e.getMessage());
             log.error("[{}] Heap dump analysis failed", analysisId, e);
+        } finally {
+            cleanupAnalysisFiles(analysisId, filePath);
         }
     }
 
@@ -131,6 +137,8 @@ public class AnalysisService {
             state.setStatus(AnalysisStatus.FAILED);
             state.setErrorMessage(e.getMessage());
             log.error("[{}] Thread dump analysis failed", analysisId, e);
+        } finally {
+            cleanupAnalysisFiles(analysisId, filePath);
         }
     }
 
@@ -169,7 +177,59 @@ public class AnalysisService {
             state.setStatus(AnalysisStatus.FAILED);
             state.setErrorMessage(e.getMessage());
             log.error("[{}] GC log analysis failed", analysisId, e);
+        } finally {
+            cleanupAnalysisFiles(analysisId, filePath);
         }
+    }
+
+    /**
+     * Deletes the uploaded file and all generated artifacts (MAT index files, ZIPs, etc.)
+     * from the analysis directory. Runs in a finally block so cleanup happens
+     * whether analysis succeeds or fails.
+     */
+    private void cleanupAnalysisFiles(String analysisId, Path filePath) {
+        try {
+            Path directory = filePath.getParent();
+            String baseName = getBaseName(filePath.getFileName().toString());
+
+            // Delete the uploaded file itself
+            if (Files.deleteIfExists(filePath)) {
+                log.info("[{}] Deleted uploaded file: {}", analysisId, filePath.getFileName());
+            }
+
+            // Delete MAT-generated files (index files, ZIPs, threads, etc.)
+            // They share the same base name as the original file
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory,
+                    entry -> entry.getFileName().toString().startsWith(baseName)
+                            && !entry.equals(filePath))) {
+                for (Path generated : stream) {
+                    try {
+                        Files.deleteIfExists(generated);
+                        log.debug("[{}] Deleted generated file: {}", analysisId, generated.getFileName());
+                    } catch (IOException e) {
+                        log.warn("[{}] Could not delete: {}", analysisId, generated.getFileName());
+                    }
+                }
+            }
+
+            // If the directory is empty after cleanup, remove it too
+            try (DirectoryStream<Path> remaining = Files.newDirectoryStream(directory)) {
+                if (!remaining.iterator().hasNext()) {
+                    Files.deleteIfExists(directory);
+                    log.info("[{}] Removed empty analysis directory: {}", analysisId, directory);
+                }
+            }
+
+            log.info("[{}] File cleanup complete", analysisId);
+
+        } catch (IOException e) {
+            log.warn("[{}] Error during file cleanup: {}", analysisId, e.getMessage());
+        }
+    }
+
+    private String getBaseName(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
     }
 
     /**

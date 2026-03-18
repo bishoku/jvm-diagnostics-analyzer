@@ -13,25 +13,45 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Runs Eclipse Memory Analyzer (MAT) headlessly via its ParseHeapDump.sh script.
+ * Runs Eclipse Memory Analyzer (MAT) headlessly via ParseHeapDump.sh.
  *
- * <p>MAT is expected to be installed at the path configured by {@code app.mat.home}.
- * The {@code ParseHeapDump.sh} script generates report ZIP files alongside the heap dump,
- * which this service then extracts to produce the leak suspects text report.</p>
+ * <p>Generates both Leak Suspects and Overview reports, then extracts and
+ * structures the most actionable data within a token budget suitable for LLM analysis.</p>
+ *
+ * <p>Token budget allocation (~15K chars total):
+ * <ul>
+ *   <li>Leak Suspects summary: ~4,000 chars</li>
+ *   <li>Per-suspect detail (top 3): ~3,000 chars</li>
+ *   <li>Top 20 class histogram: ~2,000 chars</li>
+ *   <li>Top 10 packages retained: ~1,500 chars</li>
+ *   <li>System properties (filtered): ~500 chars</li>
+ *   <li>Thread overview: ~500 chars</li>
+ * </ul>
  */
 @Service
 public class MatAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(MatAnalysisService.class);
 
-    /** Max characters to send to the LLM — keeps token usage reasonable */
+    /** Total char budget for the combined report sent to the LLM */
     private static final int MAX_REPORT_CHARS = 15_000;
+
+    /** Budget per section to keep things balanced */
+    private static final int SUSPECTS_SUMMARY_BUDGET = 4_000;
+    private static final int SUSPECTS_DETAIL_BUDGET = 3_000;
+    private static final int CLASS_HISTOGRAM_BUDGET = 2_000;
+    private static final int TOP_PACKAGES_BUDGET = 1_500;
+    private static final int SYSTEM_PROPS_BUDGET = 500;
+    private static final int THREAD_OVERVIEW_BUDGET = 500;
 
     private final String matHome;
     private final long timeoutMinutes;
@@ -44,14 +64,8 @@ public class MatAnalysisService {
     }
 
     /**
-     * Runs Eclipse MAT on the given heap dump file and returns the
-     * Leak Suspects report text.
-     *
-     * @param heapDumpPath absolute path to the .hprof file
-     * @return the text content of the leak suspects report
-     * @throws IOException          if file I/O fails
-     * @throws InterruptedException if the process is interrupted
-     * @throws RuntimeException     if MAT exits with a non-zero code
+     * Runs Eclipse MAT on the given heap dump file and returns a structured
+     * analysis report combining Leak Suspects + Overview data.
      */
     public String analyze(Path heapDumpPath) throws IOException, InterruptedException {
         Path parseScript = Paths.get(matHome, "ParseHeapDump.sh");
@@ -63,18 +77,18 @@ public class MatAnalysisService {
 
         log.info("Starting MAT analysis on {} (timeout: {} min)", heapDumpPath, timeoutMinutes);
 
-        // Only generate the Leak Suspects report (most actionable, smallest output)
+        // Run both Leak Suspects and Overview reports in a single MAT invocation
         ProcessBuilder pb = new ProcessBuilder(
                 parseScript.toString(),
                 heapDumpPath.toAbsolutePath().toString(),
-                "org.eclipse.mat.api:suspects"
+                "org.eclipse.mat.api:suspects",
+                "org.eclipse.mat.api:overview"
         );
         pb.directory(heapDumpPath.getParent().toFile());
         pb.redirectErrorStream(true);
 
         Process process = pb.start();
 
-        // Capture stdout/stderr for logging
         String processOutput;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             processOutput = reader.lines().collect(Collectors.joining("\n"));
@@ -93,117 +107,328 @@ public class MatAnalysisService {
             throw new RuntimeException("MAT analysis failed (exit code " + exitCode + "):\n" + processOutput);
         }
 
-        // MAT generates <name>_Leak_Suspects.zip alongside the heap dump
-        return extractLeakSuspectsReport(heapDumpPath.getParent());
+        return buildStructuredReport(heapDumpPath.getParent());
     }
 
+    // ========================== Report Builder ==========================
+
     /**
-     * Extracts the Leak Suspects report from the MAT-generated ZIP.
-     * Only reads the main index.html page (the summary) to keep output concise.
+     * Combines data from both report ZIPs into a single structured report.
      */
-    private String extractLeakSuspectsReport(Path directory) throws IOException {
+    private String buildStructuredReport(Path directory) throws IOException {
         StringBuilder report = new StringBuilder();
 
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory, "*_Leak_Suspects.zip")) {
-            for (Path zipPath : stream) {
-                log.info("Extracting Leak Suspects from: {}", zipPath);
-                report.append(extractMainPageFromZip(zipPath));
-            }
+        report.append("═══════════════════════════════════════════════════════════\n");
+        report.append("  ECLIPSE MAT — STRUCTURED HEAP DUMP ANALYSIS\n");
+        report.append("═══════════════════════════════════════════════════════════\n\n");
+
+        // Section 1: Leak Suspects Summary
+        String suspectsSummary = extractLeakSuspectsSummary(directory);
+        if (!suspectsSummary.isEmpty()) {
+            report.append("━━━ SECTION 1: LEAK SUSPECTS ━━━\n");
+            report.append(truncate(suspectsSummary, SUSPECTS_SUMMARY_BUDGET));
+            report.append("\n\n");
         }
 
-        if (report.isEmpty()) {
-            // Fallback: try .txt files MAT may have generated
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory, "*.txt")) {
-                for (Path txtPath : stream) {
-                    report.append("\n=== ").append(txtPath.getFileName()).append(" ===\n");
-                    report.append(Files.readString(txtPath, StandardCharsets.UTF_8));
-                }
-            }
+        // Section 2: Suspect Detail Pages (accumulation points, GC root paths)
+        String suspectsDetail = extractLeakSuspectsDetail(directory);
+        if (!suspectsDetail.isEmpty()) {
+            report.append("━━━ SECTION 2: SUSPECT DETAILS (accumulation points, paths to GC roots) ━━━\n");
+            report.append(truncate(suspectsDetail, SUSPECTS_DETAIL_BUDGET));
+            report.append("\n\n");
         }
 
-        if (report.isEmpty()) {
-            throw new IOException("No MAT Leak Suspects report found in " + directory);
+        // Section 3: Class Histogram (Top N by retained heap)
+        String histogram = extractClassHistogram(directory);
+        if (!histogram.isEmpty()) {
+            report.append("━━━ SECTION 3: TOP CLASSES BY RETAINED HEAP ━━━\n");
+            report.append(truncate(histogram, CLASS_HISTOGRAM_BUDGET));
+            report.append("\n\n");
+        }
+
+        // Section 4: Top Packages / Components
+        String packages = extractTopPackages(directory);
+        if (!packages.isEmpty()) {
+            report.append("━━━ SECTION 4: TOP PACKAGES BY RETAINED HEAP ━━━\n");
+            report.append(truncate(packages, TOP_PACKAGES_BUDGET));
+            report.append("\n\n");
+        }
+
+        // Section 5: System Properties (JVM flags)
+        String sysProps = extractSystemProperties(directory);
+        if (!sysProps.isEmpty()) {
+            report.append("━━━ SECTION 5: JVM SYSTEM PROPERTIES ━━━\n");
+            report.append(truncate(sysProps, SYSTEM_PROPS_BUDGET));
+            report.append("\n\n");
+        }
+
+        // Section 6: Thread Overview
+        String threads = extractThreadOverview(directory);
+        if (!threads.isEmpty()) {
+            report.append("━━━ SECTION 6: THREAD OVERVIEW ━━━\n");
+            report.append(truncate(threads, THREAD_OVERVIEW_BUDGET));
+            report.append("\n");
+        }
+
+        if (report.length() < 100) {
+            throw new IOException("No MAT report data found in " + directory);
         }
 
         String result = report.toString();
-
-        // Truncate if too large for the LLM context
         if (result.length() > MAX_REPORT_CHARS) {
-            log.warn("Report truncated from {} to {} chars", result.length(), MAX_REPORT_CHARS);
             result = result.substring(0, MAX_REPORT_CHARS)
-                    + "\n\n[... REPORT TRUNCATED — showing first " + MAX_REPORT_CHARS + " characters ...]";
+                    + "\n\n[... REPORT TRUNCATED at " + MAX_REPORT_CHARS + " chars ...]";
         }
 
-        log.info("Extracted report: {} chars", result.length());
+        log.info("Built structured report: {} chars ({} sections)",
+                result.length(), countSections(result));
         return result;
     }
 
-    /**
-     * Opens a MAT ZIP report and extracts only the main index.html page,
-     * stripping HTML to plain text. This gives the problem suspects summary
-     * without all the sub-page detail.
-     */
-    private String extractMainPageFromZip(Path zipPath) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Eclipse MAT — Leak Suspects Report\n");
-        sb.append("=".repeat(60)).append("\n\n");
+    // ========================== Leak Suspects ==========================
 
-        try (ZipFile zipFile = new ZipFile(zipPath.toFile())) {
-            // Prefer index.html (main summary page), fall back to any .html
-            ZipEntry mainEntry = zipFile.getEntry("index.html");
-            if (mainEntry == null) {
-                // Try to find it in a subdirectory
-                var entries = zipFile.entries();
-                while (entries.hasMoreElements()) {
-                    ZipEntry e = entries.nextElement();
-                    if (e.getName().endsWith("index.html") && !e.isDirectory()) {
-                        mainEntry = e;
-                        break;
-                    }
-                }
-            }
+    /** Extracts the main summary page from the Leak Suspects ZIP. */
+    private String extractLeakSuspectsSummary(Path directory) throws IOException {
+        Path zipPath = findZip(directory, "*_Leak_Suspects.zip");
+        if (zipPath == null) return "";
 
-            if (mainEntry != null) {
-                sb.append(htmlToPlainText(zipFile, mainEntry));
-            } else {
-                // No index.html — extract first .html file found
-                var entries = zipFile.entries();
-                while (entries.hasMoreElements()) {
-                    ZipEntry e = entries.nextElement();
-                    if (e.getName().endsWith(".html") && !e.isDirectory()) {
-                        sb.append(htmlToPlainText(zipFile, e));
-                        break;
-                    }
-                }
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            ZipEntry index = findEntry(zip, "index.html");
+            if (index == null) return "";
+            return htmlToStructuredText(readEntry(zip, index));
+        }
+    }
+
+    /** Extracts detail pages for each suspect (accumulation points, paths to GC roots). */
+    private String extractLeakSuspectsDetail(Path directory) throws IOException {
+        Path zipPath = findZip(directory, "*_Leak_Suspects.zip");
+        if (zipPath == null) return "";
+
+        StringBuilder details = new StringBuilder();
+        int suspectCount = 0;
+        int maxSuspects = 3; // Only top 3 suspects to save tokens
+
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            // Detail pages are typically named like "1.html", "2.html", etc.
+            // or "pages/1.html" in some MAT versions
+            List<? extends ZipEntry> detailPages = zip.stream()
+                    .filter(e -> !e.isDirectory())
+                    .filter(e -> e.getName().matches("(?:pages/)?\\d+\\.html"))
+                    .sorted(Comparator.comparing(ZipEntry::getName))
+                    .collect(Collectors.toList());
+
+            for (ZipEntry page : detailPages) {
+                if (suspectCount >= maxSuspects) break;
+                suspectCount++;
+
+                String text = htmlToStructuredText(readEntry(zip, page));
+                details.append("--- Suspect #").append(suspectCount).append(" Detail ---\n");
+                details.append(text).append("\n\n");
             }
         }
 
+        return details.toString();
+    }
+
+    // ========================== Overview Report ==========================
+
+    /** Extracts class histogram data from the Overview ZIP. */
+    private String extractClassHistogram(Path directory) throws IOException {
+        Path zipPath = findZip(directory, "*_System_Overview.zip");
+        if (zipPath == null) return "";
+
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            // Look for histogram page
+            ZipEntry entry = findEntryContaining(zip, "histogram");
+            if (entry == null) entry = findEntryContaining(zip, "class_statistics");
+            if (entry == null) {
+                // Fallback: try the index which often has top consumers
+                entry = findEntry(zip, "index.html");
+            }
+            if (entry == null) return "";
+
+            String text = htmlToStructuredText(readEntry(zip, entry));
+            return filterTopLines(text, 25); // Top 25 lines for class data
+        }
+    }
+
+    /** Extracts top packages/components by retained heap from the Overview ZIP. */
+    private String extractTopPackages(Path directory) throws IOException {
+        Path zipPath = findZip(directory, "*_System_Overview.zip");
+        if (zipPath == null) return "";
+
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            ZipEntry entry = findEntryContaining(zip, "top_component");
+            if (entry == null) entry = findEntryContaining(zip, "package");
+            if (entry == null) entry = findEntryContaining(zip, "biggest_objects");
+            if (entry == null) return "";
+
+            String text = htmlToStructuredText(readEntry(zip, entry));
+            return filterTopLines(text, 15);
+        }
+    }
+
+    /** Extracts JVM system properties (heap flags, GC type, etc.) from the Overview ZIP. */
+    private String extractSystemProperties(Path directory) throws IOException {
+        Path zipPath = findZip(directory, "*_System_Overview.zip");
+        if (zipPath == null) return "";
+
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            ZipEntry entry = findEntryContaining(zip, "system_properties");
+            if (entry == null) entry = findEntryContaining(zip, "environment");
+            if (entry == null) return "";
+
+            String text = htmlToStructuredText(readEntry(zip, entry));
+            return filterJvmProperties(text);
+        }
+    }
+
+    /** Extracts thread overview (count and states) from the Overview ZIP. */
+    private String extractThreadOverview(Path directory) throws IOException {
+        Path zipPath = findZip(directory, "*_System_Overview.zip");
+        if (zipPath == null) return "";
+
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            ZipEntry entry = findEntryContaining(zip, "thread");
+            if (entry == null) return "";
+
+            String text = htmlToStructuredText(readEntry(zip, entry));
+            return filterTopLines(text, 15);
+        }
+    }
+
+    // ========================== ZIP Utilities ==========================
+
+    private Path findZip(Path directory, String glob) throws IOException {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory, glob)) {
+            for (Path p : stream) return p;
+        }
+        return null;
+    }
+
+    private ZipEntry findEntry(ZipFile zip, String name) {
+        ZipEntry entry = zip.getEntry(name);
+        if (entry != null) return entry;
+        // Try with subdirectory
+        return zip.stream()
+                .filter(e -> e.getName().endsWith("/" + name) && !e.isDirectory())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ZipEntry findEntryContaining(ZipFile zip, String keyword) {
+        return zip.stream()
+                .filter(e -> !e.isDirectory() && e.getName().endsWith(".html"))
+                .filter(e -> e.getName().toLowerCase().contains(keyword.toLowerCase()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String readEntry(ZipFile zip, ZipEntry entry) throws IOException {
+        try (var is = zip.getInputStream(entry)) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    // ========================== Text Processing ==========================
+
+    /**
+     * Converts HTML to clean structured text, preserving table structure
+     * and removing noise. Better than raw strip for MAT reports.
+     */
+    private String htmlToStructuredText(String html) {
+        return html
+                .replaceAll("(?s)<script[^>]*>.*?</script>", "")
+                .replaceAll("(?s)<style[^>]*>.*?</style>", "")
+                .replaceAll("(?s)<!--.*?-->", "")
+                // Preserve table structure
+                .replaceAll("</th>\\s*<th", "  |  </th><th")
+                .replaceAll("</td>\\s*<td", "  |  </td><td")
+                .replaceAll("<br\\s*/?>", "\n")
+                .replaceAll("</p>", "\n")
+                .replaceAll("</tr>", "\n")
+                .replaceAll("</li>", "\n")
+                .replaceAll("</h[1-6]>", "\n")
+                .replaceAll("<[^>]+>", " ")
+                // HTML entities
+                .replaceAll("&nbsp;", " ")
+                .replaceAll("&amp;", "&")
+                .replaceAll("&lt;", "<")
+                .replaceAll("&gt;", ">")
+                .replaceAll("&quot;", "\"")
+                .replaceAll("&#\\d+;", "")
+                // Clean whitespace
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll("\n[ \\t]+", "\n")
+                .replaceAll("\n{3,}", "\n\n")
+                .trim();
+    }
+
+    /**
+     * Keeps only the first N non-empty lines of text.
+     * Used to limit histogram / package data to top entries.
+     */
+    private String filterTopLines(String text, int maxLines) {
+        String[] lines = text.split("\n");
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+        for (String line : lines) {
+            if (!line.isBlank()) {
+                sb.append(line.trim()).append("\n");
+                count++;
+                if (count >= maxLines) break;
+            }
+        }
         return sb.toString();
     }
 
     /**
-     * Reads an HTML ZipEntry and strips tags to produce clean plain text.
+     * Filters system properties to only JVM-relevant settings.
+     * Removes noise like file paths, locale, etc.
      */
-    private String htmlToPlainText(ZipFile zipFile, ZipEntry entry) throws IOException {
-        try (var is = zipFile.getInputStream(entry)) {
-            String html = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            return html
-                    .replaceAll("(?s)<script[^>]*>.*?</script>", "")
-                    .replaceAll("(?s)<style[^>]*>.*?</style>", "")
-                    .replaceAll("<br\\s*/?>", "\n")
-                    .replaceAll("</p>", "\n")
-                    .replaceAll("</tr>", "\n")
-                    .replaceAll("</li>", "\n")
-                    .replaceAll("<[^>]+>", " ")
-                    .replaceAll("&nbsp;", " ")
-                    .replaceAll("&amp;", "&")
-                    .replaceAll("&lt;", "<")
-                    .replaceAll("&gt;", ">")
-                    .replaceAll("&#\\d+;", "")
-                    .replaceAll("[ \t]+", " ")
-                    .replaceAll("\n[ \t]+", "\n")
-                    .replaceAll("\n{3,}", "\n\n")
-                    .trim();
+    private String filterJvmProperties(String text) {
+        Set<String> relevantKeys = Set.of(
+                "sun.java.command",
+                "java.vm.name", "java.version", "java.runtime.version",
+                "sun.arch.data.model",
+                "os.name", "os.arch"
+        );
+
+        // Also match anything with Xmx, Xms, GC, heap, memory
+        Pattern jvmFlag = Pattern.compile(
+                "(?i).*(Xmx|Xms|Xss|MaxMetaspace|GC|heap|NewRatio|SurvivorRatio|" +
+                        "MaxRAM|InitialRAM|CompressedOops|UseG1|UseZGC|UseShenandoah|" +
+                        "UseCMS|UseParallel|MaxGCPause|GCTimeRatio|PrintGC).*");
+
+        StringBuilder sb = new StringBuilder();
+        for (String line : text.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isBlank()) continue;
+
+            // Check if line contains a relevant property
+            boolean relevant = relevantKeys.stream().anyMatch(k -> trimmed.contains(k));
+            if (!relevant) {
+                Matcher m = jvmFlag.matcher(trimmed);
+                relevant = m.matches();
+            }
+            if (!relevant && trimmed.startsWith("-")) {
+                relevant = true; // JVM flags start with -
+            }
+
+            if (relevant) {
+                sb.append(trimmed).append("\n");
+            }
         }
+
+        return sb.isEmpty() ? text.lines().limit(10).collect(Collectors.joining("\n")) : sb.toString();
+    }
+
+    private String truncate(String text, int maxChars) {
+        if (text.length() <= maxChars) return text;
+        return text.substring(0, maxChars) + "\n[... truncated ...]";
+    }
+
+    private int countSections(String text) {
+        return (int) text.lines().filter(l -> l.startsWith("━━━")).count();
     }
 }

@@ -1,6 +1,6 @@
 # 🔬 JVM Diagnostics Analyzer
 
-AI-powered JVM diagnostics tool — analyze **heap dumps**, **thread dumps**, and **GC logs** with actionable insights from GPT-4o.
+AI-powered JVM diagnostics tool — analyze **heap dumps**, **thread dumps**, and **GC logs** with actionable insights from AI.
 
 Built with **Spring Boot 4**, **Java 25**, **Eclipse MAT**, and **Spring AI**.
 

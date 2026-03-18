@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.heapanalyzer</groupId>
+    <groupId>com.bishokudev</groupId>
     <artifactId>jvm-diagnostics-analyzer</artifactId>
     <version>1.0.0</version>
     <name>JVM Diagnostics Analyzer</name>
@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>25</java.version>
-        <spring-ai.version>1.1.2</spring-ai.version>
+        <spring-ai.version>2.0.0-M3</spring-ai.version>
     </properties>
 
     <dependencyManagement>
