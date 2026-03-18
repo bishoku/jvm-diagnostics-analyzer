@@ -39,15 +39,19 @@ public class ConfigService {
     private static final String DEFAULT_TEMPERATURE = "0.3";
 
     private final Path configFile;
+    private final Path promptsDir;
     private final Properties properties = new Properties();
 
     public ConfigService() {
-        this.configFile = Path.of(System.getProperty("user.home"), CONFIG_DIR, CONFIG_FILE);
+        Path configDir = Path.of(System.getProperty("user.home"), CONFIG_DIR);
+        this.configFile = configDir.resolve(CONFIG_FILE);
+        this.promptsDir = configDir.resolve("prompts");
     }
 
     // Visible for testing
     ConfigService(Path configFile) {
         this.configFile = configFile;
+        this.promptsDir = configFile.getParent().resolve("prompts");
     }
 
     @PostConstruct
@@ -155,5 +159,54 @@ public class ConfigService {
 
     public Path getConfigFilePath() {
         return configFile;
+    }
+
+    // ========================== Prompt Management ==========================
+
+    /**
+     * Returns the custom prompt for the given type, or null if using default.
+     */
+    public String getCustomPrompt(String promptType) {
+        Path promptFile = promptsDir.resolve(promptType + ".txt");
+        if (Files.exists(promptFile)) {
+            try {
+                return Files.readString(promptFile);
+            } catch (IOException e) {
+                log.warn("Failed to read custom prompt {}: {}", promptType, e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Saves a custom prompt for the given type.
+     */
+    public void savePrompt(String promptType, String content) {
+        try {
+            Files.createDirectories(promptsDir);
+            Files.writeString(promptsDir.resolve(promptType + ".txt"), content);
+            log.info("Custom prompt saved: {}", promptType);
+        } catch (IOException e) {
+            log.error("Failed to save custom prompt {}: {}", promptType, e.getMessage());
+        }
+    }
+
+    /**
+     * Resets a prompt to default by deleting the custom file.
+     */
+    public void resetPrompt(String promptType) {
+        try {
+            Files.deleteIfExists(promptsDir.resolve(promptType + ".txt"));
+            log.info("Prompt reset to default: {}", promptType);
+        } catch (IOException e) {
+            log.warn("Failed to reset prompt {}: {}", promptType, e.getMessage());
+        }
+    }
+
+    /**
+     * Returns true if the user has set a custom prompt.
+     */
+    public boolean hasCustomPrompt(String promptType) {
+        return Files.exists(promptsDir.resolve(promptType + ".txt"));
     }
 }

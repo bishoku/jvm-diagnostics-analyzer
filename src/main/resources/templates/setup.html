@@ -279,6 +279,25 @@
             .main-container { padding: 1rem; }
             .form-row { grid-template-columns: 1fr; }
         }
+        /* ========================== Prompt Tabs ========================== */
+        .prompt-tab {
+            padding: 8px 16px;
+            border: 1.5px solid var(--yk-border);
+            border-radius: var(--yk-radius-sm);
+            background: var(--yk-bg-section);
+            color: var(--yk-text-secondary);
+            font-family: 'Ubuntu', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .prompt-tab:hover { background: var(--yk-border); }
+        .prompt-tab.active {
+            background: var(--yk-blue);
+            color: var(--yk-white);
+            border-color: var(--yk-blue);
+        }
     </style>
 </head>
 <body>
@@ -358,6 +377,38 @@
         <div id="statusMsg" class="status-msg"></div>
 
         <div class="config-path" id="configPath"></div>
+    </div>
+
+    <!-- ========================== System Prompts ========================== -->
+    <div class="settings-card" style="margin-top: 1.5rem;">
+        <h2 style="font-size: 1.2rem; color: var(--yk-blue); margin-bottom: 0.5rem;">📝 System Prompts</h2>
+        <p style="font-size: 0.85rem; color: var(--yk-text-secondary); margin-bottom: 1rem;">
+            Customize the system prompts sent to the AI for each analysis type. Changes are saved per-type.
+        </p>
+
+        <div style="display: flex; gap: 6px; margin-bottom: 1rem;">
+            <button class="prompt-tab active" data-type="heap-dump" onclick="switchPromptTab('heap-dump')">Heap Dump</button>
+            <button class="prompt-tab" data-type="thread-dump" onclick="switchPromptTab('thread-dump')">Thread Dump</button>
+            <button class="prompt-tab" data-type="gc-log" onclick="switchPromptTab('gc-log')">GC Log</button>
+        </div>
+
+        <div id="promptBadge" style="font-size: 0.78rem; margin-bottom: 0.5rem; font-weight: 600;"></div>
+
+        <textarea id="promptEditor"
+                  style="width: 100%; min-height: 300px; padding: 12px; border: 1.5px solid var(--yk-border); border-radius: var(--yk-radius-sm); font-family: 'Courier New', monospace; font-size: 0.82rem; line-height: 1.5; resize: vertical; color: var(--yk-text-primary); background: var(--yk-white);"
+                  spellcheck="false"></textarea>
+
+        <div class="btn-group" style="margin-top: 1rem;">
+            <button class="btn btn-primary" onclick="savePrompt()" style="flex: none; padding: 10px 20px;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
+                Save Prompt
+            </button>
+            <button class="btn btn-secondary" onclick="resetPrompt()" style="flex: none; padding: 10px 20px;">
+                ↩ Reset to Default
+            </button>
+        </div>
+
+        <div id="promptStatus" class="status-msg" style="margin-top: 0.75rem;"></div>
     </div>
 </div>
 
@@ -494,6 +545,93 @@
     });
 
     loadSettings();
+
+    // ========================== Prompt Editor ==========================
+
+    let currentPromptType = 'heap-dump';
+    let promptDefaults = {};
+    const promptEditor = document.getElementById('promptEditor');
+    const promptBadge = document.getElementById('promptBadge');
+    const promptStatus = document.getElementById('promptStatus');
+
+    async function switchPromptTab(type) {
+        currentPromptType = type;
+
+        // Update tab active state
+        document.querySelectorAll('.prompt-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.type === type);
+        });
+
+        promptStatus.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/prompts/' + type);
+            const data = await res.json();
+
+            promptEditor.value = data.current || '';
+            promptDefaults[type] = data.default;
+
+            if (data.isCustom) {
+                promptBadge.innerHTML = '<span style="color: var(--yk-blue-light);">● Custom prompt</span> — <a href="#" onclick="resetPrompt(); return false;" style="color: var(--yk-text-muted); font-size: 0.78rem;">view default</a>';
+            } else {
+                promptBadge.innerHTML = '<span style="color: var(--yk-green);">● Using default prompt</span>';
+            }
+        } catch (e) {
+            promptEditor.value = 'Failed to load prompt: ' + e.message;
+        }
+    }
+
+    async function savePrompt() {
+        const content = promptEditor.value.trim();
+        if (!content) {
+            showPromptStatus('error', 'Prompt content cannot be empty.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/prompts/' + currentPromptType, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showPromptStatus('success', '✓ ' + data.message);
+                promptBadge.innerHTML = '<span style="color: var(--yk-blue-light);">● Custom prompt</span> — <a href="#" onclick="resetPrompt(); return false;" style="color: var(--yk-text-muted); font-size: 0.78rem;">reset to default</a>';
+            } else {
+                showPromptStatus('error', data.error || 'Save failed.');
+            }
+        } catch (e) {
+            showPromptStatus('error', 'Network error: ' + e.message);
+        }
+    }
+
+    async function resetPrompt() {
+        try {
+            const res = await fetch('/api/prompts/' + currentPromptType, { method: 'DELETE' });
+            const data = await res.json();
+
+            if (res.ok) {
+                promptEditor.value = data.current || promptDefaults[currentPromptType] || '';
+                promptBadge.innerHTML = '<span style="color: var(--yk-green);">● Using default prompt</span>';
+                showPromptStatus('success', '✓ Prompt reset to default.');
+            } else {
+                showPromptStatus('error', data.error || 'Reset failed.');
+            }
+        } catch (e) {
+            showPromptStatus('error', 'Network error: ' + e.message);
+        }
+    }
+
+    function showPromptStatus(type, message) {
+        promptStatus.className = 'status-msg ' + type;
+        promptStatus.textContent = message;
+        promptStatus.style.display = 'block';
+    }
+
+    // Load first prompt tab
+    switchPromptTab('heap-dump');
 </script>
 </body>
 </html>

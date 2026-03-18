@@ -227,6 +227,58 @@ public class AnalysisController {
         return ResponseEntity.ok(Map.of("message", "MAT download started."));
     }
 
+    // ========================== Prompt Endpoints ==========================
+
+    /** Returns the current and default prompt for the given type. */
+    @GetMapping("/api/prompts/{type}")
+    @ResponseBody
+    public ResponseEntity<?> getPrompt(@PathVariable String type) {
+        try {
+            return ResponseEntity.ok(Map.of(
+                    "type", type,
+                    "current", springAiService.getEffectivePrompt(type),
+                    "default", springAiService.getDefaultPrompt(type),
+                    "isCustom", configService.hasCustomPrompt(type)
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Saves a custom prompt. */
+    @PostMapping("/api/prompts/{type}")
+    @ResponseBody
+    public ResponseEntity<?> savePrompt(@PathVariable String type, @RequestBody Map<String, String> body) {
+        String content = body.get("content");
+        if (content == null || content.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Prompt content is required."));
+        }
+        try {
+            springAiService.getDefaultPrompt(type); // validate type
+            configService.savePrompt(type, content);
+            return ResponseEntity.ok(Map.of("message", "Custom prompt saved.", "isCustom", true));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Resets a prompt to default. */
+    @DeleteMapping("/api/prompts/{type}")
+    @ResponseBody
+    public ResponseEntity<?> resetPrompt(@PathVariable String type) {
+        try {
+            springAiService.getDefaultPrompt(type); // validate type
+            configService.resetPrompt(type);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Prompt reset to default.",
+                    "isCustom", false,
+                    "current", springAiService.getDefaultPrompt(type)
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // ========================== Upload Endpoints ==========================
 
     /** Upload a heap dump (.hprof) file for analysis. */

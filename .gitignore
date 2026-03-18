@@ -30,3 +30,6 @@ heap-dumps/
 .mvn/
 mvnw
 mvnw.cmd
+
+# Local helper scripts
+release.sh
