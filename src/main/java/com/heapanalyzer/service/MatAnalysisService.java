@@ -422,7 +422,13 @@ public class MatAnalysisService {
             if (trimmed.isBlank()) continue;
 
             // Check if line contains a relevant property
-            boolean relevant = relevantKeys.stream().anyMatch(k -> trimmed.contains(k));
+            boolean relevant = false;
+            for (String k : relevantKeys) {
+                if (trimmed.contains(k)) {
+                    relevant = true;
+                    break;
+                }
+            }
             if (!relevant) {
                 Matcher m = jvmFlag.matcher(trimmed);
                 relevant = m.matches();
