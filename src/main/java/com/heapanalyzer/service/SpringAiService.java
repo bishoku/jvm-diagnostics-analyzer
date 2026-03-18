@@ -3,19 +3,27 @@ package com.heapanalyzer.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+
 /**
- * Integrates with OpenAI via Spring AI to interpret
+ * Integrates with OpenAI-compatible APIs via Spring AI to interpret
  * static analysis reports and produce actionable recommendations.
- * Supports heap dump, thread dump, and GC log analysis.
+ *
+ * <p>Supports runtime reconfiguration — the AI client can be rebuilt
+ * when the user changes their API key or model via the settings page.</p>
  */
 @Service
 public class SpringAiService {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiService.class);
 
-    private final ChatClient chatClient;
+    private final ConfigService configService;
+    private volatile ChatClient chatClient;
 
     private static final String HEAP_DUMP_PROMPT = """
             You are an expert Java Performance Engineer with deep expertise in JVM internals,
@@ -108,8 +116,56 @@ public class SpringAiService {
             Format your response in clean Markdown with headers, bullet points, and code blocks where appropriate.
             """;
 
-    public SpringAiService(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
+    public SpringAiService(ConfigService configService) {
+        this.configService = configService;
+    }
+
+    @PostConstruct
+    public void init() {
+        if (configService.isConfigured()) {
+            reconfigure();
+            log.info("AI client initialized with saved configuration");
+        } else {
+            log.info("No API key configured — AI client not initialized. Use /setup to configure.");
+        }
+    }
+
+    /**
+     * Rebuilds the ChatClient from the current ConfigService settings.
+     * Called on startup and when the user saves new settings.
+     */
+    public void reconfigure() {
+        String apiKey = configService.getApiKey();
+        String baseUrl = configService.getBaseUrl();
+        String model = configService.getModel();
+        double temperature = configService.getTemperature();
+
+        log.info("Configuring AI client: baseUrl={}, model={}, temperature={}", baseUrl, model, temperature);
+
+        OpenAiApi openAiApi = OpenAiApi.builder()
+                .apiKey(apiKey)
+                .baseUrl(baseUrl)
+                .build();
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(model)
+                .temperature(temperature)
+                .build();
+
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(openAiApi)
+                .defaultOptions(options)
+                .build();
+
+        this.chatClient = ChatClient.builder(chatModel).build();
+        log.info("AI client reconfigured successfully");
+    }
+
+    /**
+     * Returns true if the AI client is ready to accept requests.
+     */
+    public boolean isReady() {
+        return chatClient != null;
     }
 
     /**
@@ -134,6 +190,11 @@ public class SpringAiService {
     }
 
     private String sendToAi(String systemPrompt, String content, String type) {
+        if (chatClient == null) {
+            throw new IllegalStateException(
+                    "AI is not configured. Please set your API key in Settings (/setup).");
+        }
+
         log.info("Sending {} report to AI ({} chars)...", type, content.length());
 
         String response = chatClient.prompt()

@@ -6,7 +6,10 @@ import com.heapanalyzer.model.AnalysisStatus;
 import com.heapanalyzer.model.AnalysisType;
 import com.heapanalyzer.service.AnalysisHistoryService;
 import com.heapanalyzer.service.AnalysisService;
+import com.heapanalyzer.service.ConfigService;
 import com.heapanalyzer.service.FileStorageService;
+import com.heapanalyzer.service.MatDownloadService;
+import com.heapanalyzer.service.SpringAiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -31,13 +34,22 @@ public class AnalysisController {
     private final FileStorageService fileStorageService;
     private final AnalysisService analysisService;
     private final AnalysisHistoryService historyService;
+    private final ConfigService configService;
+    private final SpringAiService springAiService;
+    private final MatDownloadService matDownloadService;
 
     public AnalysisController(FileStorageService fileStorageService,
                               AnalysisService analysisService,
-                              AnalysisHistoryService historyService) {
+                              AnalysisHistoryService historyService,
+                              ConfigService configService,
+                              SpringAiService springAiService,
+                              MatDownloadService matDownloadService) {
         this.fileStorageService = fileStorageService;
         this.analysisService = analysisService;
         this.historyService = historyService;
+        this.configService = configService;
+        this.springAiService = springAiService;
+        this.matDownloadService = matDownloadService;
     }
 
     // ========================== Page Routes ==========================
@@ -83,6 +95,134 @@ public class AnalysisController {
             case THREAD_DUMP -> "thread-dump";
             case GC_LOG -> "gc-log";
         };
+    }
+
+    /** First-run setup page — shown when no API key is configured. */
+    @GetMapping("/setup")
+    public String setupPage() {
+        // If already configured, redirect to home
+        if (configService.isConfigured()) {
+            return "redirect:/";
+        }
+        return "setup";
+    }
+
+    /** Settings page — accessible anytime from nav. */
+    @GetMapping("/settings")
+    public String settingsPage() {
+        return "setup";
+    }
+
+    // ========================== Settings API ==========================
+
+    /** Returns current settings (with masked API key). */
+    @GetMapping("/api/settings")
+    @ResponseBody
+    public ResponseEntity<?> getSettings() {
+        return ResponseEntity.ok(Map.of(
+                "configured", configService.isConfigured(),
+                "maskedApiKey", configService.getMaskedApiKey(),
+                "baseUrl", configService.getBaseUrl(),
+                "model", configService.getModel(),
+                "temperature", configService.getTemperature(),
+                "configFile", configService.getConfigFilePath().toString()
+        ));
+    }
+
+    /** Saves settings, reconfigures the AI client, and returns success. */
+    @PostMapping("/api/settings")
+    @ResponseBody
+    public ResponseEntity<?> saveSettings(@RequestBody Map<String, String> body) {
+        String apiKey = body.get("apiKey");
+        if (apiKey == null || apiKey.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "API key is required."));
+        }
+
+        configService.save(
+                apiKey,
+                body.getOrDefault("baseUrl", "https://openrouter.ai/api"),
+                body.getOrDefault("model", "openai/gpt-4o"),
+                body.getOrDefault("temperature", "0.3")
+        );
+
+        try {
+            springAiService.reconfigure();
+            return ResponseEntity.ok(Map.of(
+                    "message", "Settings saved successfully.",
+                    "configured", true
+            ));
+        } catch (Exception e) {
+            log.error("Failed to reconfigure AI client", e);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Settings saved but AI client configuration failed: " + e.getMessage(),
+                    "configured", true,
+                    "warning", e.getMessage()
+            ));
+        }
+    }
+
+    /** Tests the AI connection with a minimal prompt. */
+    @PostMapping("/api/settings/test")
+    @ResponseBody
+    public ResponseEntity<?> testConnection() {
+        if (!springAiService.isReady()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "AI client is not configured. Save your settings first."));
+        }
+
+        try {
+            // Tiny prompt to test connectivity — should use minimal tokens
+            String response = springAiService.analyze(
+                    "Test connection. Respond with exactly: CONNECTION_OK");
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "message", "Connection successful!",
+                    "response", response != null ? response.substring(0, Math.min(100, response.length())) : ""
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of(
+                    "status", "error",
+                    "message", "Connection failed: " + e.getMessage()
+            ));
+        }
+    }
+
+    // ========================== MAT Endpoints ==========================
+
+    /** Returns MAT availability and download status. */
+    @GetMapping("/api/mat/status")
+    @ResponseBody
+    public ResponseEntity<?> matStatus() {
+        return ResponseEntity.ok(Map.of(
+                "available", matDownloadService.isAvailable(),
+                "downloading", matDownloadService.isDownloading(),
+                "status", matDownloadService.getDownloadStatus(),
+                "progress", matDownloadService.getDownloadProgress()
+        ));
+    }
+
+    /** Triggers MAT download (if not already installed). */
+    @PostMapping("/api/mat/download")
+    @ResponseBody
+    public ResponseEntity<?> downloadMat() {
+        if (matDownloadService.isAvailable()) {
+            return ResponseEntity.ok(Map.of("message", "MAT is already installed."));
+        }
+        if (matDownloadService.isDownloading()) {
+            return ResponseEntity.ok(Map.of("message", "Download already in progress."));
+        }
+
+        // Run download in background
+        Thread.startVirtualThread(() -> {
+            try {
+                matDownloadService.downloadAndInstall();
+            } catch (Exception e) {
+                log.error("MAT download failed", e);
+            }
+        });
+
+        return ResponseEntity.ok(Map.of("message", "MAT download started."));
     }
 
     // ========================== Upload Endpoints ==========================

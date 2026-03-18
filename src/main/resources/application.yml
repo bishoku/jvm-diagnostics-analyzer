@@ -10,6 +10,9 @@ spring:
       resolve-lazily: true
 
   ai:
+    chat:
+      client:
+        enabled: false
     openai:
       api-key: ${OPENROUTER_API_KEY:sk-placeholder}
       base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
@@ -31,3 +34,5 @@ app:
     core-pool-size: ${ASYNC_CORE_POOL_SIZE:2}
     max-pool-size: ${ASYNC_MAX_POOL_SIZE:4}
     queue-capacity: ${ASYNC_QUEUE_CAPACITY:10}
+  browser:
+    auto-open: ${APP_BROWSER_AUTO_OPEN:true}

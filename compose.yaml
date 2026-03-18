@@ -25,6 +25,9 @@ services:
 
       # JVM tuning (optional)
       - JAVA_OPTS=${JAVA_OPTS:--Xms512m -Xmx2g}
+
+      # Desktop features (disabled in Docker)
+      - APP_BROWSER_AUTO_OPEN=false
     volumes:
       - upload-data:/data/uploads
     restart: unless-stopped

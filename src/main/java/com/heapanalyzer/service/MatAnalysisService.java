@@ -53,14 +53,23 @@ public class MatAnalysisService {
     private static final int SYSTEM_PROPS_BUDGET = 500;
     private static final int THREAD_OVERVIEW_BUDGET = 500;
 
-    private final String matHome;
+    private final MatDownloadService matDownloadService;
     private final long timeoutMinutes;
 
     public MatAnalysisService(
             @Value("${app.mat.home:/opt/mat}") String matHome,
-            @Value("${app.mat.timeout-minutes:30}") long timeoutMinutes) {
-        this.matHome = matHome;
+            @Value("${app.mat.timeout-minutes:30}") long timeoutMinutes,
+            MatDownloadService matDownloadService) {
         this.timeoutMinutes = timeoutMinutes;
+        this.matDownloadService = matDownloadService;
+    }
+
+    /**
+     * Returns the effective MAT home path — uses auto-downloaded location
+     * if configured path doesn't exist.
+     */
+    private String getMatHome() {
+        return matDownloadService.getEffectiveMatHome();
     }
 
     /**
@@ -68,11 +77,18 @@ public class MatAnalysisService {
      * analysis report combining Leak Suspects + Overview data.
      */
     public String analyze(Path heapDumpPath) throws IOException, InterruptedException {
-        Path parseScript = Paths.get(matHome, "ParseHeapDump.sh");
+        // Auto-download MAT if not available
+        if (!matDownloadService.isAvailable()) {
+            log.info("MAT not found, attempting auto-download...");
+            matDownloadService.downloadAndInstall();
+        }
+
+        String effectiveMatHome = getMatHome();
+        Path parseScript = Paths.get(effectiveMatHome, "ParseHeapDump.sh");
 
         if (!Files.isExecutable(parseScript)) {
             throw new IOException("MAT ParseHeapDump.sh not found or not executable at: " + parseScript
-                    + ". Make sure Eclipse MAT is installed at " + matHome);
+                    + ". Make sure Eclipse MAT is installed at " + effectiveMatHome);
         }
 
         log.info("Starting MAT analysis on {} (timeout: {} min)", heapDumpPath, timeoutMinutes);
