@@ -231,14 +231,4 @@ public class AnalysisService {
         int dotIndex = fileName.lastIndexOf('.');
         return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
     }
-
-    /**
-     * @deprecated Use {@link #runHeapDumpAnalysis(String, Path)} instead.
-     * Kept for backward compatibility.
-     */
-    @Deprecated
-    @Async("analysisExecutor")
-    public void runAnalysis(String analysisId, Path filePath) {
-        runHeapDumpAnalysis(analysisId, filePath);
-    }
 }
