@@ -45,13 +45,19 @@ public class MatAnalysisService {
     /** Total char budget for the combined report sent to the LLM */
     private static final int MAX_REPORT_CHARS = 15_000;
 
-    /** Budget per section to keep things balanced */
+    /** Budget per section to keep balanced */
     private static final int SUSPECTS_SUMMARY_BUDGET = 4_000;
     private static final int SUSPECTS_DETAIL_BUDGET = 3_000;
     private static final int CLASS_HISTOGRAM_BUDGET = 2_000;
     private static final int TOP_PACKAGES_BUDGET = 1_500;
     private static final int SYSTEM_PROPS_BUDGET = 500;
     private static final int THREAD_OVERVIEW_BUDGET = 500;
+
+    private static final Pattern JVM_FLAG_PATTERN = Pattern.compile(
+            "(?i).*(Xmx|Xms|Xss|MaxMetaspace|GC|heap|NewRatio|SurvivorRatio|" +
+                    "MaxRAM|InitialRAM|CompressedOops|UseG1|UseZGC|UseShenandoah|" +
+                    "UseCMS|UseParallel|MaxGCPause|GCTimeRatio|PrintGC).*"
+    );
 
     private final MatDownloadService matDownloadService;
     private final long timeoutMinutes;
@@ -410,12 +416,6 @@ public class MatAnalysisService {
                 "os.name", "os.arch"
         );
 
-        // Also match anything with Xmx, Xms, GC, heap, memory
-        Pattern jvmFlag = Pattern.compile(
-                "(?i).*(Xmx|Xms|Xss|MaxMetaspace|GC|heap|NewRatio|SurvivorRatio|" +
-                        "MaxRAM|InitialRAM|CompressedOops|UseG1|UseZGC|UseShenandoah|" +
-                        "UseCMS|UseParallel|MaxGCPause|GCTimeRatio|PrintGC).*");
-
         StringBuilder sb = new StringBuilder();
         for (String line : text.split("\n")) {
             String trimmed = line.trim();
@@ -430,7 +430,7 @@ public class MatAnalysisService {
                 }
             }
             if (!relevant) {
-                Matcher m = jvmFlag.matcher(trimmed);
+                Matcher m = JVM_FLAG_PATTERN.matcher(trimmed);
                 relevant = m.matches();
             }
             if (!relevant && trimmed.startsWith("-")) {
