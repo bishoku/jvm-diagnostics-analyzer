@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Parses JVM GC log files and extracts structured statistics
@@ -49,99 +50,116 @@ public class GcLogAnalysisService {
      * Parses the GC log file and produces a structured summary.
      */
     public String analyze(Path gcLogPath) throws IOException {
-        String content = Files.readString(gcLogPath, StandardCharsets.UTF_8);
-        log.info("Parsing GC log: {} ({} chars)", gcLogPath.getFileName(), content.length());
+        log.info("Parsing GC log: {}", gcLogPath.getFileName());
 
         StringBuilder report = new StringBuilder();
         report.append("GC Log Analysis Report\n");
         report.append("=".repeat(60)).append("\n\n");
 
-        String[] lines = content.split("\n");
-
-        // Detect GC collector type
-        String collectorType = detectCollector(content);
-        report.append("## GC Configuration\n\n");
-        report.append(String.format("Detected Collector: %s\n", collectorType));
-        report.append(String.format("Total log lines: %d\n\n", lines.length));
-
-        // Parse GC events
+        // Metrics to accumulate
         List<Double> pauseTimes = new ArrayList<>();
         List<Double> fullGcPauseTimes = new ArrayList<>();
         List<String> gcEventTypes = new ArrayList<>();
-        int youngGcCount = 0;
-        int fullGcCount = 0;
-        int mixedGcCount = 0;
-        long maxHeapUsedKB = 0;
-        long maxHeapCapacityKB = 0;
-        long minHeapAfterGcKB = Long.MAX_VALUE;
+        final int[] youngGcCount = {0};
+        final int[] fullGcCount = {0};
+        final int[] mixedGcCount = {0};
+        final long[] maxHeapUsedKB = {0};
+        final long[] maxHeapCapacityKB = {0};
+        final long[] minHeapAfterGcKB = {Long.MAX_VALUE};
+        final long[] totalLines = {0};
 
-        for (String line : lines) {
-            // Unified logging format
-            Matcher unifiedPause = UNIFIED_PAUSE_PATTERN.matcher(line);
-            if (unifiedPause.find()) {
-                String type = unifiedPause.group(1);
-                double pauseMs = Double.parseDouble(unifiedPause.group(2));
-                pauseTimes.add(pauseMs);
+        StringBuilder logPrefix = new StringBuilder();
 
-                switch (type) {
-                    case "Young" -> youngGcCount++;
-                    case "Full" -> {
-                        fullGcCount++;
-                        fullGcPauseTimes.add(pauseMs);
+        try (Stream<String> lines = Files.lines(gcLogPath, StandardCharsets.UTF_8)) {
+            lines.forEach(line -> {
+                totalLines[0]++;
+
+                // Capture prefix for collector detection and raw report section
+                if (logPrefix.length() < MAX_REPORT_CHARS) {
+                    if (logPrefix.length() > 0) {
+                        logPrefix.append("\n");
                     }
-                    case "Mixed" -> mixedGcCount++;
+                    if (logPrefix.length() + line.length() < MAX_REPORT_CHARS) {
+                        logPrefix.append(line);
+                    } else {
+                        logPrefix.append(line, 0, MAX_REPORT_CHARS - logPrefix.length());
+                    }
                 }
-                gcEventTypes.add(type);
-            }
 
-            // Legacy format
-            Matcher legacyGc = LEGACY_GC_PATTERN.matcher(line);
-            if (legacyGc.find() && !line.contains("Full GC")) {
-                double pauseSecs = Double.parseDouble(legacyGc.group(1));
-                pauseTimes.add(pauseSecs * 1000);
-                youngGcCount++;
-            }
+                // Unified logging format
+                Matcher unifiedPause = UNIFIED_PAUSE_PATTERN.matcher(line);
+                if (unifiedPause.find()) {
+                    String type = unifiedPause.group(1);
+                    double pauseMs = Double.parseDouble(unifiedPause.group(2));
+                    pauseTimes.add(pauseMs);
 
-            Matcher legacyFullGc = LEGACY_FULL_GC_PATTERN.matcher(line);
-            if (legacyFullGc.find()) {
-                double pauseSecs = Double.parseDouble(legacyFullGc.group(1));
-                double pauseMs = pauseSecs * 1000;
-                pauseTimes.add(pauseMs);
-                fullGcPauseTimes.add(pauseMs);
-                fullGcCount++;
-            }
+                    switch (type) {
+                        case "Young" -> youngGcCount[0]++;
+                        case "Full" -> {
+                            fullGcCount[0]++;
+                            fullGcPauseTimes.add(pauseMs);
+                        }
+                        case "Mixed" -> mixedGcCount[0]++;
+                    }
+                    gcEventTypes.add(type);
+                }
 
-            // Heap size tracking (unified)
-            Matcher unifiedHeap = UNIFIED_HEAP_PATTERN.matcher(line);
-            while (unifiedHeap.find()) {
-                long beforeMB = Long.parseLong(unifiedHeap.group(1));
-                long afterMB = Long.parseLong(unifiedHeap.group(2));
-                long capacityMB = Long.parseLong(unifiedHeap.group(3));
-                maxHeapUsedKB = Math.max(maxHeapUsedKB, beforeMB * 1024);
-                maxHeapCapacityKB = Math.max(maxHeapCapacityKB, capacityMB * 1024);
-                minHeapAfterGcKB = Math.min(minHeapAfterGcKB, afterMB * 1024);
-            }
+                // Legacy format
+                Matcher legacyGc = LEGACY_GC_PATTERN.matcher(line);
+                if (legacyGc.find() && !line.contains("Full GC")) {
+                    double pauseSecs = Double.parseDouble(legacyGc.group(1));
+                    pauseTimes.add(pauseSecs * 1000);
+                    youngGcCount[0]++;
+                }
 
-            // Heap size tracking (legacy)
-            Matcher heapSize = HEAP_SIZE_PATTERN.matcher(line);
-            while (heapSize.find()) {
-                long beforeKB = Long.parseLong(heapSize.group(1));
-                long afterKB = Long.parseLong(heapSize.group(2));
-                long capacityKB = Long.parseLong(heapSize.group(3));
-                maxHeapUsedKB = Math.max(maxHeapUsedKB, beforeKB);
-                maxHeapCapacityKB = Math.max(maxHeapCapacityKB, capacityKB);
-                minHeapAfterGcKB = Math.min(minHeapAfterGcKB, afterKB);
-            }
+                Matcher legacyFullGc = LEGACY_FULL_GC_PATTERN.matcher(line);
+                if (legacyFullGc.find()) {
+                    double pauseSecs = Double.parseDouble(legacyFullGc.group(1));
+                    double pauseMs = pauseSecs * 1000;
+                    pauseTimes.add(pauseMs);
+                    fullGcPauseTimes.add(pauseMs);
+                    fullGcCount[0]++;
+                }
+
+                // Heap size tracking (unified)
+                Matcher unifiedHeap = UNIFIED_HEAP_PATTERN.matcher(line);
+                while (unifiedHeap.find()) {
+                    long beforeMB = Long.parseLong(unifiedHeap.group(1));
+                    long afterMB = Long.parseLong(unifiedHeap.group(2));
+                    long capacityMB = Long.parseLong(unifiedHeap.group(3));
+                    maxHeapUsedKB[0] = Math.max(maxHeapUsedKB[0], beforeMB * 1024);
+                    maxHeapCapacityKB[0] = Math.max(maxHeapCapacityKB[0], capacityMB * 1024);
+                    minHeapAfterGcKB[0] = Math.min(minHeapAfterGcKB[0], afterMB * 1024);
+                }
+
+                // Heap size tracking (legacy)
+                Matcher heapSize = HEAP_SIZE_PATTERN.matcher(line);
+                while (heapSize.find()) {
+                    long beforeKB = Long.parseLong(heapSize.group(1));
+                    long afterKB = Long.parseLong(heapSize.group(2));
+                    long capacityKB = Long.parseLong(heapSize.group(3));
+                    maxHeapUsedKB[0] = Math.max(maxHeapUsedKB[0], beforeKB);
+                    maxHeapCapacityKB[0] = Math.max(maxHeapCapacityKB[0], capacityKB);
+                    minHeapAfterGcKB[0] = Math.min(minHeapAfterGcKB[0], afterKB);
+                }
+            });
         }
+
+        // Detect GC collector type from the captured prefix
+        String prefix = logPrefix.toString();
+        String collectorType = detectCollector(prefix);
+        report.append("## GC Configuration\n\n");
+        report.append(String.format("Detected Collector: %s\n", collectorType));
+        report.append(String.format("Total log lines: %d\n\n", totalLines[0]));
 
         // GC Event Summary
         report.append("## GC Event Summary\n\n");
-        int totalGcEvents = youngGcCount + fullGcCount + mixedGcCount;
+        int totalGcEvents = youngGcCount[0] + fullGcCount[0] + mixedGcCount[0];
         report.append(String.format("Total GC events: %d\n", totalGcEvents));
-        report.append(String.format("  Young GC:  %d\n", youngGcCount));
-        report.append(String.format("  Full GC:   %d\n", fullGcCount));
-        if (mixedGcCount > 0) {
-            report.append(String.format("  Mixed GC:  %d\n", mixedGcCount));
+        report.append(String.format("  Young GC:  %d\n", youngGcCount[0]));
+        report.append(String.format("  Full GC:   %d\n", fullGcCount[0]));
+        if (mixedGcCount[0] > 0) {
+            report.append(String.format("  Mixed GC:  %d\n", mixedGcCount[0]));
         }
         report.append("\n");
 
@@ -184,21 +202,21 @@ public class GcLogAnalysisService {
                 report.append("⚠️ WARNING: ").append(above1000ms)
                         .append(" pause(s) exceeded 1 second!\n\n");
             }
-            if (fullGcCount > totalGcEvents * 0.1 && fullGcCount > 5) {
+            if (fullGcCount[0] > totalGcEvents * 0.1 && fullGcCount[0] > 5) {
                 report.append("⚠️ WARNING: High ratio of Full GC events (")
-                        .append(String.format("%.1f%%", fullGcCount * 100.0 / totalGcEvents))
+                        .append(String.format("%.1f%%", fullGcCount[0] * 100.0 / totalGcEvents))
                         .append(") — possible memory pressure!\n\n");
             }
         }
 
         // Heap Usage
-        if (maxHeapCapacityKB > 0) {
+        if (maxHeapCapacityKB[0] > 0) {
             report.append("## Heap Usage\n\n");
-            report.append(String.format("Max heap used:       %s\n", formatKB(maxHeapUsedKB)));
-            report.append(String.format("Max heap capacity:   %s\n", formatKB(maxHeapCapacityKB)));
-            if (minHeapAfterGcKB < Long.MAX_VALUE) {
-                report.append(String.format("Min heap after GC:   %s\n", formatKB(minHeapAfterGcKB)));
-                double liveDataPct = (minHeapAfterGcKB * 100.0) / maxHeapCapacityKB;
+            report.append(String.format("Max heap used:       %s\n", formatKB(maxHeapUsedKB[0])));
+            report.append(String.format("Max heap capacity:   %s\n", formatKB(maxHeapCapacityKB[0])));
+            if (minHeapAfterGcKB[0] < Long.MAX_VALUE) {
+                report.append(String.format("Min heap after GC:   %s\n", formatKB(minHeapAfterGcKB[0])));
+                double liveDataPct = (minHeapAfterGcKB[0] * 100.0) / maxHeapCapacityKB[0];
                 report.append(String.format("Estimated live data: %.1f%% of capacity\n", liveDataPct));
             }
             report.append("\n");
@@ -208,7 +226,7 @@ public class GcLogAnalysisService {
         report.append("## Raw GC Log (for detailed analysis)\n\n");
         report.append("```\n");
 
-        String rawSection = content;
+        String rawSection = prefix;
         int remainingChars = MAX_REPORT_CHARS - report.length() - 100;
         if (rawSection.length() > remainingChars && remainingChars > 0) {
             rawSection = rawSection.substring(0, remainingChars)
@@ -218,9 +236,9 @@ public class GcLogAnalysisService {
         report.append("\n```\n");
 
         String result = report.toString();
-        log.info("GC log analysis complete: {} events, max pause {:.2f}ms, {} chars",
+        log.info("GC log analysis complete: {} events, max pause {}ms, {} chars",
                 totalGcEvents,
-                pauseTimes.isEmpty() ? 0 : pauseTimes.stream().mapToDouble(d -> d).max().orElse(0),
+                pauseTimes.isEmpty() ? 0 : String.format("%.2f", pauseTimes.stream().mapToDouble(d -> d).max().orElse(0)),
                 result.length());
         return result;
     }
