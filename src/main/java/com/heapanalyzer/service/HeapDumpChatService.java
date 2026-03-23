@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -73,7 +73,7 @@ public class HeapDumpChatService {
     private final McpSessionManager mcpSessionManager;
 
     /** Spring AI chat memory — stores conversation per session ID. */
-    private final ChatMemory chatMemory = new InMemoryChatMemory();
+    private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
 
     public HeapDumpChatService(SpringAiService springAiService,
                                HeapDumpMcpTools heapDumpMcpTools,
