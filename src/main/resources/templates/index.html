@@ -8,106 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
     <style>
-        /* ========================== Yapı Kredi Design System ========================== */
-        :root {
-            --yk-blue: #004990;
-            --yk-blue-dark: #003366;
-            --yk-blue-light: #1a6bc4;
-            --yk-blue-hover: #005bb5;
-            --yk-red: #D9322D;
-            --yk-red-hover: #c12a26;
-            --yk-white: #FFFFFF;
-            --yk-bg-light: #F5F7FA;
-            --yk-bg-section: #EDF1F7;
-            --yk-text-primary: #282828;
-            --yk-text-secondary: #5a6a7a;
-            --yk-text-muted: #8b95a5;
-            --yk-border: #e0e6ed;
-            --yk-shadow: 0 2px 12px rgba(0, 73, 144, 0.08);
-            --yk-shadow-hover: 0 8px 30px rgba(0, 73, 144, 0.15);
-            --yk-radius: 12px;
-            --yk-radius-sm: 8px;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--yk-bg-light);
-            color: var(--yk-text-primary);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* ========================== Navigation ========================== */
-        .nav {
-            background: var(--yk-blue);
-            padding: 0 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 64px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            color: var(--yk-white);
-        }
-
-        .nav-brand-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--yk-white);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .nav-brand-icon svg {
-            width: 22px;
-            height: 22px;
-            color: var(--yk-blue);
-        }
-
-        .nav-brand-text {
-            font-size: 1.15rem;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            list-style: none;
-        }
-
-        .nav-links a {
-            color: rgba(255, 255, 255, 0.85);
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-
-        .nav-links a:hover, .nav-links a.active {
-            background: rgba(255, 255, 255, 0.15);
-            color: var(--yk-white);
-        }
-
-        /* ========================== Hero Section ========================== */
+        /* ========================== Hero Section (index only) ========================== */
         .hero {
             background: linear-gradient(135deg, var(--yk-blue) 0%, var(--yk-blue-dark) 100%);
             padding: 4rem 2rem 5rem;
@@ -116,380 +19,98 @@
             position: relative;
             overflow: hidden;
         }
-
         .hero::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 600px;
-            height: 600px;
+            content: ''; position: absolute; top: -50%; right: -20%;
+            width: 600px; height: 600px;
             background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
             border-radius: 50%;
         }
-
         .hero::after {
-            content: '';
-            position: absolute;
-            bottom: -30%;
-            left: -10%;
-            width: 400px;
-            height: 400px;
+            content: ''; position: absolute; bottom: -30%; left: -10%;
+            width: 400px; height: 400px;
             background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
             border-radius: 50%;
         }
-
-        .hero-content {
-            position: relative;
-            z-index: 1;
-            max-width: 700px;
-            margin: 0 auto;
-        }
-
+        .hero-content { position: relative; z-index: 1; max-width: 700px; margin: 0 auto; }
         .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(10px);
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-bottom: 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px);
+            padding: 6px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 500;
+            margin-bottom: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.15);
         }
-
-        .hero h1 {
-            font-size: 2.75rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            line-height: 1.2;
-            letter-spacing: -0.5px;
-        }
-
-        .hero p {
-            font-size: 1.1rem;
-            color: rgba(255, 255, 255, 0.8);
-            line-height: 1.6;
-            max-width: 550px;
-            margin: 0 auto;
-        }
+        .hero h1 { font-size: 2.75rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; letter-spacing: -0.5px; }
+        .hero p { font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); line-height: 1.6; max-width: 550px; margin: 0 auto; }
 
         /* ========================== Tool Cards ========================== */
-        .tools-section {
-            max-width: 1100px;
-            margin: -3rem auto 3rem;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 10;
-        }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-        }
-
+        .tools-section { max-width: 1100px; margin: -3rem auto 3rem; padding: 0 2rem; position: relative; z-index: 10; }
+        .tools-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
         .tool-card {
-            background: var(--yk-white);
-            border-radius: var(--yk-radius);
-            padding: 2rem 1.75rem;
-            box-shadow: var(--yk-shadow);
-            border: 1px solid var(--yk-border);
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            text-decoration: none;
-            color: inherit;
-            cursor: pointer;
+            background: var(--yk-white); border-radius: var(--yk-radius);
+            padding: 2rem 1.75rem; box-shadow: var(--yk-shadow); border: 1px solid var(--yk-border);
+            transition: all 0.3s ease; display: flex; flex-direction: column;
+            text-decoration: none; color: inherit; cursor: pointer;
         }
-
-        .tool-card:hover {
-            box-shadow: var(--yk-shadow-hover);
-            transform: translateY(-4px);
-            border-color: var(--yk-blue-light);
-        }
-
+        .tool-card:hover { box-shadow: var(--yk-shadow-hover); transform: translateY(-4px); border-color: var(--yk-blue-light); }
         .tool-card-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.25rem;
+            width: 56px; height: 56px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;
         }
-
-        .tool-card-icon svg {
-            width: 28px;
-            height: 28px;
-            color: var(--yk-white);
-        }
-
-        .tool-card-icon.heap { background: linear-gradient(135deg, #004990, #1a6bc4); }
+        .tool-card-icon svg { width: 28px; height: 28px; color: var(--yk-white); }
+        .tool-card-icon.heap   { background: linear-gradient(135deg, #004990, #1a6bc4); }
         .tool-card-icon.thread { background: linear-gradient(135deg, #7c3aed, #a855f7); }
-        .tool-card-icon.gc { background: linear-gradient(135deg, #059669, #34d399); }
+        .tool-card-icon.gc     { background: linear-gradient(135deg, #059669, #34d399); }
+        .tool-card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--yk-text-primary); }
+        .tool-card p { font-size: 0.9rem; color: var(--yk-text-secondary); line-height: 1.6; flex-grow: 1; margin-bottom: 1.25rem; }
+        .tool-card-cta { display: inline-flex; align-items: center; gap: 6px; font-size: 0.875rem; font-weight: 600; color: var(--yk-blue); transition: gap 0.2s ease; }
+        .tool-card:hover .tool-card-cta { gap: 10px; }
+        .tool-card-cta svg { width: 16px; height: 16px; }
 
-        .tool-card h3 {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: var(--yk-text-primary);
-        }
-
-        .tool-card p {
-            font-size: 0.9rem;
-            color: var(--yk-text-secondary);
-            line-height: 1.6;
-            flex-grow: 1;
-            margin-bottom: 1.25rem;
-        }
-
-        .tool-card-cta {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--yk-blue);
-            transition: gap 0.2s ease;
-        }
-
-        .tool-card:hover .tool-card-cta {
-            gap: 10px;
-        }
-
-        .tool-card-cta svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        /* ========================== Features Section ========================== */
-        .features-section {
-            background: var(--yk-white);
-            padding: 4rem 2rem;
-            border-top: 1px solid var(--yk-border);
-        }
-
-        .features-container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        .features-container h2 {
-            text-align: center;
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: var(--yk-text-primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .features-subtitle {
-            text-align: center;
-            color: var(--yk-text-secondary);
-            margin-bottom: 2.5rem;
-            font-size: 1rem;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-        }
-
-        .feature-item {
-            text-align: center;
-            padding: 1.5rem 1rem;
-        }
-
-        .feature-icon {
-            font-size: 2rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .feature-item h4 {
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 0.4rem;
-            color: var(--yk-text-primary);
-        }
-
-        .feature-item p {
-            font-size: 0.8rem;
-            color: var(--yk-text-muted);
-            line-height: 1.5;
-        }
-
-        /* ========================== Footer ========================== */
-        .footer {
-            margin-top: auto;
-            background: var(--yk-blue-dark);
-            color: rgba(255, 255, 255, 0.6);
-            text-align: center;
-            padding: 1.5rem 2rem;
-            font-size: 0.8rem;
-        }
-
-        .footer a {
-            color: rgba(255, 255, 255, 0.8);
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            color: var(--yk-white);
-        }
+        /* ========================== Features ========================== */
+        .features-section { background: var(--yk-white); padding: 4rem 2rem; border-top: 1px solid var(--yk-border); }
+        .features-container { max-width: 1100px; margin: 0 auto; }
+        .features-container h2 { text-align: center; font-size: 1.75rem; font-weight: 700; color: var(--yk-text-primary); margin-bottom: 0.5rem; }
+        .features-subtitle { text-align: center; color: var(--yk-text-secondary); margin-bottom: 2.5rem; font-size: 1rem; }
+        .features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+        .feature-item { text-align: center; padding: 1.5rem 1rem; }
+        .feature-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+        .feature-item h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--yk-text-primary); }
+        .feature-item p { font-size: 0.8rem; color: var(--yk-text-muted); line-height: 1.5; }
 
         /* ========================== History Table ========================== */
-        .history-section {
-            max-width: 1100px;
-            margin: 0 auto 3rem;
-            padding: 0 2rem;
-        }
-
-        .history-container {
-            background: var(--yk-white);
-            border-radius: var(--yk-radius);
-            box-shadow: var(--yk-shadow);
-            border: 1px solid var(--yk-border);
-            overflow: hidden;
-        }
-
-        .history-header {
-            padding: 1.5rem 2rem 1rem;
-        }
-
-        .history-header h2 {
-            font-size: 1.35rem;
-            font-weight: 700;
-            color: var(--yk-text-primary);
-            margin-bottom: 0.25rem;
-        }
-
-        .history-subtitle {
-            font-size: 0.875rem;
-            color: var(--yk-text-muted);
-        }
-
-        .history-table-wrapper {
-            overflow-x: auto;
-        }
-
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .history-table thead th {
-            text-align: left;
-            padding: 0.75rem 1.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--yk-text-muted);
-            border-top: 1px solid var(--yk-border);
-            border-bottom: 1px solid var(--yk-border);
-            background: var(--yk-bg-light);
-        }
-
-        .history-table tbody tr {
-            border-bottom: 1px solid var(--yk-border);
-            transition: background 0.15s ease;
-        }
-
-        .history-table tbody tr:last-child {
-            border-bottom: none;
-        }
-
-        .history-table tbody tr:hover {
-            background: var(--yk-bg-light);
-        }
-
-        .history-table td {
-            padding: 0.875rem 1.5rem;
-            font-size: 0.875rem;
-            color: var(--yk-text-primary);
-        }
-
-        .file-name {
-            font-family: 'Ubuntu Mono', monospace;
-            font-weight: 500;
-        }
-
-        .date-cell {
-            color: var(--yk-text-muted);
-            font-size: 0.8rem;
-        }
-
-        .type-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-
-        .badge-heap { background: #e8f0fe; color: #004990; }
+        .history-section { max-width: 1100px; margin: 0 auto 3rem; padding: 0 2rem; }
+        .history-container { background: var(--yk-white); border-radius: var(--yk-radius); box-shadow: var(--yk-shadow); border: 1px solid var(--yk-border); overflow: hidden; }
+        .history-header { padding: 1.5rem 2rem 1rem; }
+        .history-header h2 { font-size: 1.35rem; font-weight: 700; color: var(--yk-text-primary); margin-bottom: 0.25rem; }
+        .history-subtitle { font-size: 0.875rem; color: var(--yk-text-muted); }
+        .history-table-wrapper { overflow-x: auto; }
+        .history-table { width: 100%; border-collapse: collapse; }
+        .history-table thead th { text-align: left; padding: 0.75rem 1.5rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--yk-text-muted); border-top: 1px solid var(--yk-border); border-bottom: 1px solid var(--yk-border); background: var(--yk-bg-light); }
+        .history-table tbody tr { border-bottom: 1px solid var(--yk-border); transition: background 0.15s ease; }
+        .history-table tbody tr:last-child { border-bottom: none; }
+        .history-table tbody tr:hover { background: var(--yk-bg-light); }
+        .history-table td { padding: 0.875rem 1.5rem; font-size: 0.875rem; color: var(--yk-text-primary); }
+        .file-name { font-family: 'Ubuntu Mono', monospace; font-weight: 500; }
+        .date-cell { color: var(--yk-text-muted); font-size: 0.8rem; }
+        .type-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .badge-heap   { background: #e8f0fe; color: #004990; }
         .badge-thread { background: #f3e8ff; color: #7c3aed; }
-        .badge-gc { background: #ecfdf5; color: #059669; }
+        .badge-gc     { background: #ecfdf5; color: #059669; }
+        .status-pill { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; background: #ecfdf5; color: #059669; }
+        .view-link { color: var(--yk-blue); text-decoration: none; font-weight: 600; font-size: 0.85rem; transition: color 0.2s; }
+        .view-link:hover { color: var(--yk-blue-hover); }
 
-        .status-pill {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            background: #ecfdf5;
-            color: #059669;
-        }
-
-        .view-link {
-            color: var(--yk-blue);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: color 0.2s;
-        }
-
-        .view-link:hover {
-            color: var(--yk-blue-hover);
-        }
-
-        /* ========================== Responsive ========================== */
         @media (max-width: 768px) {
             .hero h1 { font-size: 2rem; }
             .tools-grid { grid-template-columns: 1fr; }
             .features-grid { grid-template-columns: repeat(2, 1fr); }
-            .nav-links { display: none; }
         }
-
-        @media (max-width: 480px) {
-            .features-grid { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 480px) { .features-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
 <!-- Navigation -->
-<nav class="nav">
-    <a href="/" class="nav-brand">
-        <div class="nav-brand-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
-        </div>
-        <span class="nav-brand-text">JVM Diagnostics</span>
-    </a>
-    <ul class="nav-links">
-        <li><a href="/heap">Heap Dump</a></li>
-        <li><a href="/thread-dump">Thread Dump</a></li>
-        <li><a href="/gc-log">GC Log</a></li>
-        <li><a href="/settings">⚙ Settings</a></li>
-    </ul>
-</nav>
+<nav th:replace="~{fragments :: nav('index')}"></nav>
 
 <!-- Hero Section -->
 <section class="hero">
@@ -637,10 +258,7 @@
 </section>
 
 <!-- Footer -->
-<footer class="footer">
-    JVM Diagnostics Analyzer &middot; Spring Boot + Eclipse MAT + Spring AI &middot;
-    <a href="https://github.com" target="_blank">GitHub</a>
-</footer>
+<footer th:replace="~{fragments :: footer}"></footer>
 
 </body>
 </html>

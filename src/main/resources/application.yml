@@ -20,6 +20,12 @@ spring:
         options:
           model: ${AI_MODEL:openai/gpt-4o}
           temperature: ${AI_TEMPERATURE:0.3}
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:true}
+        name: jvm-diagnostics-analyzer
+        version: 2.0.0
+        type: SYNC
 
   thymeleaf:
     cache: false
@@ -36,3 +42,5 @@ app:
     queue-capacity: ${ASYNC_QUEUE_CAPACITY:10}
   browser:
     auto-open: ${APP_BROWSER_AUTO_OPEN:true}
+  mcp:
+    session-timeout-minutes: ${MCP_SESSION_TIMEOUT:120}

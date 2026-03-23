@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MCP Logs — JVM Diagnostics Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <style>
+        .logs-container { max-width: 1000px; margin: 0 auto; padding: 2rem; flex-grow: 1; width: 100%; display: flex; flex-direction: column; height: calc(100vh - 64px - 149px); }
+        .logs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+        .logs-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--yk-text-primary); }
+        .logs-header .session-id { font-family: 'Ubuntu Mono', monospace; font-size: 0.85rem; padding: 4px 8px; background: var(--yk-bg-section); border-radius: 4px; color: var(--yk-text-secondary); margin-left: 8px; }
+        
+        .log-panel { flex-grow: 1; background: #1e1e1e; border-radius: var(--yk-radius); overflow-y: auto; padding: 1.5rem; border: 1px solid var(--yk-border); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 12px; font-family: 'Ubuntu Mono', monospace; font-size: 0.85rem; }
+        
+        .log-entry { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid #333; }
+        .log-entry:last-child { border-bottom: none; }
+        
+        .log-meta { display: flex; align-items: center; gap: 12px; color: #888; font-size: 0.8rem; }
+        .log-badge { padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; }
+        .log-badge.req { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .log-badge.res { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .log-id { color: #facc15; }
+        .log-dur { color: #a78bfa; }
+        
+        .log-body { margin: 0; padding: 10px 12px; background: #252526; border-radius: 6px; color: #e4e4e7; white-space: pre-wrap; word-break: break-all; border-left: 3px solid transparent; }
+        .log-body.req-body { border-left-color: #3b82f6; }
+        .log-body.res-body { border-left-color: #10b981; }
+
+        .connection-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; padding: 6px 12px; border-radius: 20px; }
+        .connection-status.active { background: var(--yk-green-light); color: var(--yk-green-dark); }
+        .connection-status.disconnected { background: var(--yk-red-light); color: var(--yk-red); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.active { background: var(--yk-green); box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2); animation: pulse-green 2s infinite; }
+        .status-dot.disconnected { background: var(--yk-red); }
+
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(5, 150, 105, 0); } 100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); } }
+
+        .back-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 600; color: var(--yk-blue); text-decoration: none; margin-bottom: 1rem; }
+        .back-btn:hover { text-decoration: underline; }
+        .back-btn svg { width: 18px; height: 18px; }
+    </style>
+</head>
+<body>
+
+<nav th:replace="~{fragments :: nav('mcp')}"></nav>
+
+<div class="logs-container">
+    <a href="/mcp" class="back-btn">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        Back to MCP
+    </a>
+
+    <div class="logs-header">
+        <h2>Live Session Logs <span class="session-id" th:text="${sessionId}">sess-123</span></h2>
+        <div id="connStatus" class="connection-status disconnected">
+            <div id="connDot" class="status-dot disconnected"></div>
+            <span id="connText">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="log-panel" id="logPanel">
+        <!-- Logs appended here -->
+    </div>
+</div>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const sessionId = /*[[${sessionId}]]*/ 'default';
+    const logPanel = document.getElementById('logPanel');
+    const connStatus = document.getElementById('connStatus');
+    const connDot = document.getElementById('connDot');
+    const connText = document.getElementById('connText');
+
+    let eventSource = null;
+
+    function setConnected(connected) {
+        if (connected) {
+            connStatus.className = 'connection-status active';
+            connDot.className = 'status-dot active';
+            connText.textContent = 'Live';
+        } else {
+            connStatus.className = 'connection-status disconnected';
+            connDot.className = 'status-dot disconnected';
+            connText.textContent = 'Disconnected';
+        }
+    }
+
+    function appendLog(log) {
+        const entryDate = new Date(log.timestamp);
+        const timeStr = entryDate.toLocaleTimeString() + '.' + entryDate.getMilliseconds().toString().padStart(3, '0');
+        
+        const isReq = log.type === 'REQUEST';
+        const badgeClass = isReq ? 'req' : 'res';
+        const bodyClass = isReq ? 'req-body' : 'res-body';
+        const typeLabel = isReq ? 'REQ' : 'RES';
+        const durationStr = log.durationMs !== null ? `<span class="log-dur">${log.durationMs}ms</span>` : '';
+
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+
+        div.innerHTML = `
+            <div class="log-meta">
+                <span class="log-badge ${badgeClass}">${typeLabel}</span>
+                <span>${timeStr}</span>
+                <span class="log-id">id: ${log.id}</span>
+                ${durationStr}
+            </div>
+            <pre class="log-body ${bodyClass}">${JSON.stringify(log.payload, null, 2)}</pre>
+        `;
+
+        logPanel.appendChild(div);
+        
+        // Auto-scroll to bottom
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+
+    async function loadRecentLogs() {
+        try {
+            const res = await fetch(`/api/mcp/${sessionId}/logs/recent`);
+            if (res.ok) {
+                const logs = await res.json();
+                logs.forEach(appendLog);
+            }
+        } catch (e) {
+            console.error("Failed to load recent logs:", e);
+        }
+    }
+
+    function connectSSE() {
+        if (eventSource) eventSource.close();
+
+        eventSource = new EventSource(`/api/mcp/${sessionId}/logs/stream`);
+
+        eventSource.onopen = () => setConnected(true);
+
+        eventSource.addEventListener('mcpLog', (e) => {
+            try {
+                const log = JSON.parse(e.data);
+                appendLog(log);
+            } catch (err) {
+                console.error("Failed to parse log event", err);
+            }
+        });
+
+        eventSource.addEventListener('sessionClosed', () => {
+            setConnected(false);
+            eventSource.close();
+            const div = document.createElement('div');
+            div.style.color = 'var(--yk-red)';
+            div.style.padding = '10px';
+            div.style.textAlign = 'center';
+            div.textContent = 'Session closed by server.';
+            logPanel.appendChild(div);
+            logPanel.scrollTop = logPanel.scrollHeight;
+        });
+
+        eventSource.onerror = () => {
+            setConnected(false);
+            // EventSource auto-reconnects natively unless we close it
+        };
+    }
+
+    // Init
+    loadRecentLogs().then(connectSSE);
+    /*]]>*/
+</script>
+</body>
+</html>

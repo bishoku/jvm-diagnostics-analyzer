@@ -26,6 +26,10 @@ services:
       # JVM tuning (optional)
       - JAVA_OPTS=${JAVA_OPTS:--Xms512m -Xmx2g}
 
+      # MCP Server (optional)
+      - MCP_ENABLED=${MCP_ENABLED:-true}
+      - MCP_SESSION_TIMEOUT=${MCP_SESSION_TIMEOUT:-120}
+
       # Desktop features (disabled in Docker)
       - APP_BROWSER_AUTO_OPEN=false
     volumes:

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MCP Server — JVM Diagnostics Analyzer</title>
+    <meta name="description"
+        content="MCP Server for interactive heap dump analysis. Connect your coding agent and chat with your heap dump." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+    <style>
+        /* ========================== MCP Page Specific ========================== */
+        .hero {
+            background: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #1976d2 100%);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: var(--yk-white);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            top: -40%;
+            right: -15%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(10px);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .hero h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.5px;
+        }
+
+        .hero p {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+            max-width: 550px;
+            margin: 0 auto;
+        }
+
+        .main-container {
+            margin: 0 auto;
+            padding: 2rem;
+            width: 100%;
+            flex: 1;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: var(--yk-white);
+            border-radius: var(--yk-radius);
+            box-shadow: var(--yk-shadow);
+            padding: 1.75rem;
+            border: 1px solid var(--yk-border);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--yk-blue);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.active {
+            background: var(--yk-green);
+            box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+            animation: mcpPulse 2s infinite;
+        }
+
+        .status-dot.idle {
+            background: var(--yk-text-muted);
+        }
+
+        .status-dot.parsing {
+            background: #ffc107;
+            box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
+            animation: mcpPulse 1s infinite;
+        }
+
+        .status-dot.error {
+            background: var(--yk-red);
+        }
+
+        @keyframes mcpPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .status-label {
+            color: var(--yk-text-muted);
+            min-width: 100px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .status-value {
+            color: var(--yk-text-primary);
+            font-weight: 500;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--yk-border);
+            border-radius: var(--yk-radius);
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--yk-bg-light);
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: var(--yk-blue);
+            background: #e8f0fe;
+        }
+
+        .upload-zone svg {
+            width: 48px;
+            height: 48px;
+            color: var(--yk-blue-light);
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+        }
+
+        .upload-zone p {
+            font-size: 0.85rem;
+            color: var(--yk-text-muted);
+        }
+
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem 1.25rem;
+            border-radius: var(--yk-radius-sm);
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 0.82rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            position: relative;
+            margin-bottom: 0.75rem;
+        }
+
+        .code-block .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #94a3b8;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.72rem;
+            font-family: "Ubuntu", sans-serif;
+            transition: all 0.2s;
+        }
+
+        .code-block .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #e2e8f0;
+        }
+
+        .code-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--yk-text-secondary);
+            margin-bottom: 0.35rem;
+        }
+
+        .agent-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .agent-tab {
+            padding: 6px 14px;
+            border: 1.5px solid var(--yk-border);
+            border-radius: var(--yk-radius-sm);
+            background: var(--yk-bg-section);
+            color: var(--yk-text-secondary);
+            font-family: "Ubuntu", sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .agent-tab:hover {
+            background: var(--yk-border);
+        }
+
+        .agent-tab.active {
+            background: var(--yk-blue);
+            color: var(--yk-white);
+            border-color: var(--yk-blue);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--yk-radius-sm);
+            font-family: "Ubuntu", sans-serif;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-danger {
+            background: var(--yk-red);
+            color: var(--yk-white);
+        }
+
+        .btn-danger:hover {
+            background: #c12a26;
+        }
+
+        .progress-bar-mcp {
+            width: 100%;
+            height: 6px;
+            background: var(--yk-bg-section);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.75rem;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--yk-blue);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .status-msg {
+            padding: 0.75rem 1rem;
+            border-radius: var(--yk-radius-sm);
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .status-msg.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-msg.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-msg.info {
+            display: block;
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .tool-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tool-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--yk-border);
+            font-size: 0.85rem;
+        }
+
+        .tool-list li:last-child {
+            border-bottom: none;
+        }
+
+        .tool-name {
+            font-family: "Ubuntu Mono", monospace;
+            font-weight: 600;
+            color: var(--yk-blue);
+            min-width: 170px;
+            font-size: 0.82rem;
+        }
+
+        .tool-desc {
+            color: var(--yk-text-secondary);
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav th:replace="~{fragments :: nav('mcp')}"></nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                </svg>
+                Model Context Protocol · SSE
+            </div>
+            <h1>🔌 MCP Server</h1>
+            <p>Upload a heap dump and chat with it from your coding agent. Connect Claude Code, GitHub Copilot, Cursor,
+                or any MCP-compatible client.</p>
+        </div>
+    </section>
+
+    <div class="main-container">
+
+        <!-- Upload Card -->
+        <div class="card" style="margin-bottom: 1.5rem;" id="uploadCard">
+            <div class="card-title">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                </svg>
+                Upload Heap Dump for MCP
+            </div>
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
+                </svg>
+                <h3>Drop your .hprof file here</h3>
+                <p>or click to browse — the heap dump will be parsed for interactive querying</p>
+                <input type="file" id="fileInput" accept=".hprof" />
+            </div>
+            <div id="uploadProgress" class="upload-progress">
+                <div class="upload-info">
+                    <div class="upload-info-left">
+                        <div class="spinner"></div>
+                        <span id="uploadFileName" class="upload-file-name"></span>
+                    </div>
+                    <span id="uploadPercent" class="upload-percent">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="uploadBar" class="progress-bar"></div>
+                </div>
+                <p id="uploadSize" class="upload-size"></p>
+            </div>
+            <div id="uploadStatus" class="status-msg"></div>
+        </div>
+
+        <!-- Status + Connection Info -->
+        <div class="grid-2">
+            <!-- Server Status -->
+            <div class="card">
+                <div class="card-title">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M5.636 18.364a9 9 0 0 1 0-12.728m12.728 0a9 9 0 0 1 0 12.728M12 12v.01" />
+                    </svg>
+                    Server Status
+                </div>
+                <div id="serverStatus">
+                    <div class="status-row">
+                        <span class="status-label">MCP</span>
+                        <span class="status-dot active"></span>
+                        <span class="status-value">Running</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Protocol</span>
+                        <span class="status-value" id="mcpProtocol">SSE</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Endpoint</span>
+                        <span class="status-value" id="mcpEndpoint"
+                            style="font-family: 'Ubuntu Mono', monospace; font-size: 0.82rem;">/sse</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Session</span>
+                        <span class="status-dot idle" id="sessionDot"></span>
+                        <span class="status-value" id="sessionStatus">No active session</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Session -->
+            <div class="card" id="sessionCard">
+                <div class="card-title">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                    Active Session
+                </div>
+                <div id="sessionDetails">
+                    <p style="color: var(--yk-text-muted); font-size: 0.88rem;">No heap dump loaded. Upload a
+                        <code>.hprof</code> file to start.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Tools -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-title">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743" />
+                </svg>
+                Available MCP Tools
+            </div>
+            <ul class="tool-list">
+                <li><span class="tool-name">get_heap_summary</span><span class="tool-desc">Heap overview: total size,
+                        object count, class count, JVM info</span></li>
+                <li><span class="tool-name">get_leak_suspects</span><span class="tool-desc">Memory leak suspects with
+                        accumulation points and paths to GC roots</span></li>
+                <li><span class="tool-name">get_class_histogram</span><span class="tool-desc">Top classes by retained
+                        heap (filterable by class name regex)</span></li>
+                <li><span class="tool-name">get_dominator_tree</span><span class="tool-desc">Top objects dominating the
+                        most retained memory</span></li>
+                <li><span class="tool-name">get_top_consumers</span><span class="tool-desc">Biggest consumers grouped by
+                        class, classloader, and package</span></li>
+                <li><span class="tool-name">run_oql_query</span><span class="tool-desc">Execute OQL (SQL-like) queries:
+                        <code>SELECT * FROM java.lang.String WHERE @retainedHeapSize > 1000000</code></span></li>
+                <li><span class="tool-name">get_thread_stacks</span><span class="tool-desc">Thread stack traces with
+                        local variables and retained sizes</span></li>
+            </ul>
+        </div>
+
+        <!-- Connection Guide -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-title">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+                </svg>
+                Connect Your Coding Agent
+            </div>
+
+            <div class="agent-tabs">
+                <button class="agent-tab active" data-agent="claude" onclick="switchAgent('claude')">Claude
+                    Code</button>
+                <button class="agent-tab" data-agent="copilot" onclick="switchAgent('copilot')">GitHub Copilot</button>
+                <button class="agent-tab" data-agent="cursor" onclick="switchAgent('cursor')">Cursor</button>
+                <button class="agent-tab" data-agent="antigravity"
+                    onclick="switchAgent('antigravity')">Antigravity</button>
+                <button class="agent-tab" data-agent="generic" onclick="switchAgent('generic')">Generic SSE</button>
+            </div>
+
+            <!-- Claude Code -->
+            <div class="agent-config" id="config-claude">
+                <div class="code-label">Run in terminal:</div>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre
+                        id="claude-code">claude mcp add jvm-diagnostics --transport sse --url http://localhost:8080/sse</pre>
+                </div>
+            </div>
+
+            <!-- GitHub Copilot -->
+            <div class="agent-config" id="config-copilot" style="display:none;">
+                <div class="code-label">.vscode/mcp.json</div>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre id="copilot-code">{
+  "servers": {
+    "jvm-diagnostics": {
+      "type": "sse",
+      "url": "http://localhost:8080/sse"
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <!-- Cursor -->
+            <div class="agent-config" id="config-cursor" style="display:none;">
+                <div class="code-label">.cursor/mcp.json</div>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre id="cursor-code">{
+  "mcpServers": {
+    "jvm-diagnostics": {
+      "url": "http://localhost:8080/sse"
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <!-- Antigravity -->
+            <div class="agent-config" id="config-antigravity" style="display:none;">
+                <div class="code-label">.gemini/settings.json</div>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre id="antigravity-code">{
+  "mcpServers": {
+    "jvm-diagnostics": {
+      "type": "sse",
+      "url": "http://localhost:8080/sse"
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <!-- Generic -->
+            <div class="agent-config" id="config-generic" style="display:none;">
+                <div class="code-label">SSE Endpoint:</div>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <pre id="generic-code">http://localhost:8080/sse</pre>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--yk-text-muted); margin-top: 0.5rem;">
+                    Any MCP client that supports SSE transport can connect to this endpoint.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <footer th:replace="~{fragments :: footer}"></footer>
+
+    <script>
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadBar = document.getElementById('uploadBar');
+        const uploadPercent = document.getElementById('uploadPercent');
+        const uploadFileName = document.getElementById('uploadFileName');
+        const uploadSize = document.getElementById('uploadSize');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Drag & Drop
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) uploadFile(fileInput.files[0]); });
+
+        function uploadFile(file) {
+            if (!file.name.toLowerCase().endsWith('.hprof')) {
+                showUploadStatus('error', 'Please upload a .hprof file.');
+                return;
+            }
+
+            // Show upload progress
+            uploadProgress.classList.add('visible');
+            uploadFileName.textContent = file.name;
+            uploadSize.textContent = formatBytes(file.size);
+            uploadBar.style.width = '0%';
+            uploadPercent.textContent = '0%';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/mcp/upload');
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    uploadBar.style.width = pct + '%';
+                    uploadPercent.textContent = pct + '%';
+                    uploadSize.textContent = `${formatBytes(e.loaded)} / ${formatBytes(e.total)}`;
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    uploadProgress.classList.remove('visible');
+                    showUploadStatus('success', '\u2713 ' + data.message);
+                    pollSessionStatus();
+                } else {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        showUploadStatus('error', '\u2717 ' + (data.error || 'Upload failed'));
+                    } catch (e) {
+                        showUploadStatus('error', '\u2717 Upload failed: ' + xhr.statusText);
+                    }
+                    uploadProgress.classList.remove('visible');
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                uploadProgress.classList.remove('visible');
+                showUploadStatus('error', 'Network error during upload.');
+            });
+
+            xhr.send(formData);
+        }
+
+        function showUploadStatus(type, msg) {
+            uploadStatus.className = 'status-msg ' + type;
+            uploadStatus.textContent = msg;
+            uploadStatus.style.display = 'block';
+        }
+
+        // ========================== Status Polling ==========================
+
+        let pollInterval = null;
+
+        async function pollSessionStatus() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(refreshStatus, 3000);
+            refreshStatus();
+        }
+
+        async function refreshStatus() {
+            try {
+                const res = await fetch('/api/mcp/status');
+                const data = await res.json();
+
+                const sessionDot = document.getElementById('sessionDot');
+                const sessionStatus = document.getElementById('sessionStatus');
+                const sessionDetails = document.getElementById('sessionDetails');
+                const endpoint = document.getElementById('mcpEndpoint');
+
+                if (data.mcpEndpoint) endpoint.textContent = data.mcpEndpoint;
+
+                if (data.active) {
+                    if (data.parsed) {
+                        sessionDot.className = 'status-dot active';
+                        sessionStatus.textContent = 'Active — ready for queries';
+                        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+                        uploadProgress.style.display = 'none';
+                    } else if (data.parseError) {
+                        sessionDot.className = 'status-dot error';
+                        sessionStatus.textContent = 'Parse failed';
+                        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+                        uploadProgress.style.display = 'none';
+                    } else {
+                        sessionDot.className = 'status-dot parsing';
+                        sessionStatus.textContent = 'Parsing heap dump...';
+                    }
+
+                    const sizeMB = (data.fileSizeBytes / (1024 * 1024)).toFixed(1);
+                    sessionDetails.innerHTML = `
+                    <div class="status-row">
+                        <span class="status-label">File</span>
+                        <span class="status-value">${data.fileName}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Size</span>
+                        <span class="status-value">${sizeMB} MB</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Status</span>
+                        <span class="status-value">${data.parsed ? '✅ Parsed' : (data.parseError ? '❌ ' + data.parseError : '⏳ Parsing...')}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Timeout</span>
+                        <span class="status-value">${data.sessionTimeoutMinutes} min idle</span>
+                    </div>
+                    <div style="margin-top: 1.25rem; display: flex; gap: 10px;">
+                        <a href="/mcp/${data.sessionId}/logs" class="btn btn-secondary" style="flex: 1; text-align: center;">📄 View Logs</a>
+                        <button class="btn btn-danger" style="flex: 1;" onclick="closeSession()">✕ Close</button>
+                    </div>
+                `;
+                } else {
+                    sessionDot.className = 'status-dot idle';
+                    sessionStatus.textContent = 'No active session';
+                    sessionDetails.innerHTML = '<p style="color: var(--yk-text-muted); font-size: 0.88rem;">No heap dump loaded. Upload a <code>.hprof</code> file to start.</p>';
+                }
+            } catch (e) {
+                console.error('Status poll failed:', e);
+            }
+        }
+
+        async function closeSession() {
+            try {
+                await fetch('/api/mcp/session', { method: 'DELETE' });
+                refreshStatus();
+                showUploadStatus('info', 'Session closed.');
+            } catch (e) {
+                console.error('Close failed:', e);
+            }
+        }
+
+        // ========================== Agent Config Tabs ==========================
+
+        function switchAgent(agent) {
+            document.querySelectorAll('.agent-tab').forEach(t => t.classList.toggle('active', t.dataset.agent === agent));
+            document.querySelectorAll('.agent-config').forEach(c => c.style.display = 'none');
+            document.getElementById('config-' + agent).style.display = 'block';
+        }
+
+        function copyCode(btn) {
+            const pre = btn.parentElement.querySelector('pre');
+            navigator.clipboard.writeText(pre.textContent.trim());
+            btn.textContent = '✓ Copied';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        }
+
+        // Update code blocks with actual server URL
+        function updateUrls() {
+            const baseUrl = window.location.origin;
+            document.getElementById('claude-code').textContent =
+                `claude mcp add jvm-diagnostics --transport sse --url ${baseUrl}/sse`;
+            document.getElementById('copilot-code').textContent = JSON.stringify({
+                servers: { "jvm-diagnostics": { type: "sse", url: baseUrl + "/sse" } }
+            }, null, 2);
+            document.getElementById('cursor-code').textContent = JSON.stringify({
+                mcpServers: { "jvm-diagnostics": { url: baseUrl + "/sse" } }
+            }, null, 2);
+            document.getElementById('antigravity-code').textContent = JSON.stringify({
+                mcpServers: { "jvm-diagnostics": { type: "sse", url: baseUrl + "/sse" } }
+            }, null, 2);
+            document.getElementById('generic-code').textContent = baseUrl + '/sse';
+        }
+
+        // Init
+        updateUrls();
+        refreshStatus();
+    </script>
+</body>
+
+</html>

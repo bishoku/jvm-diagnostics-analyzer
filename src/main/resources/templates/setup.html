@@ -8,318 +8,69 @@
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
     <style>
-        /* ========================== Design System ========================== */
-        :root {
-            --yk-blue: #004990;
-            --yk-blue-dark: #003366;
-            --yk-blue-light: #1a6bc4;
-            --yk-blue-hover: #005bb5;
-            --yk-green: #28a745;
-            --yk-green-dark: #218838;
-            --yk-red: #D9322D;
-            --yk-white: #FFFFFF;
-            --yk-bg-light: #F5F7FA;
-            --yk-bg-section: #EDF1F7;
-            --yk-text-primary: #282828;
-            --yk-text-secondary: #5a6a7a;
-            --yk-text-muted: #8b95a5;
-            --yk-border: #e0e6ed;
-            --yk-shadow: 0 2px 12px rgba(0, 73, 144, 0.08);
-            --yk-shadow-hover: 0 8px 30px rgba(0, 73, 144, 0.15);
-            --yk-radius: 12px;
-            --yk-radius-sm: 8px;
-        }
+        /* ========================== Settings Page Specific ========================== */
+        .settings-header { margin-bottom: 2rem; text-align: center; }
+        .settings-header h2 { font-size: 1.5rem; font-weight: 700; color: var(--yk-text-primary); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .settings-header svg { width: 28px; height: 28px; color: var(--yk-blue); }
+        .settings-header p { font-size: 0.95rem; color: var(--yk-text-secondary); }
+        .settings-card { background: var(--yk-white); border-radius: var(--yk-radius); box-shadow: var(--yk-shadow); border: 1px solid var(--yk-border); padding: 2rem; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; font-size: 0.9rem; font-weight: 600; color: var(--yk-text-primary); margin-bottom: 0.5rem; }
+        .form-group label span.required { color: var(--yk-red); margin-left: 4px; }
+        .form-control { width: 100%; padding: 0.75rem 1rem; font-family: inherit; font-size: 0.95rem; color: var(--yk-text-primary); background: var(--yk-bg-light); border: 1.5px solid var(--yk-border); border-radius: var(--yk-radius-sm); transition: all 0.2s; }
+        .form-control:focus { outline: none; border-color: var(--yk-blue-light); background: var(--yk-white); box-shadow: 0 0 0 4px rgba(26, 107, 196, 0.1); }
+        .form-text { display: block; font-size: 0.8rem; color: var(--yk-text-muted); margin-top: 0.4rem; }
+        .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 0.875rem; font-size: 1rem; font-weight: 600; color: var(--yk-white); background: var(--yk-blue); border: none; border-radius: var(--yk-radius-sm); cursor: pointer; transition: all 0.2s; }
+        .btn-primary:hover { background: var(--yk-blue-hover); transform: translateY(-1px); }
+        .btn-primary svg { width: 20px; height: 20px; }
+        .alert-success { background: var(--yk-green-light); border: 1px solid #a7f3d0; color: var(--yk-green-dark); padding: 1rem; border-radius: var(--yk-radius-sm); margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 12px; font-size: 0.9rem; line-height: 1.5; }
+        .alert-success svg { flex-shrink: 0; width: 20px; height: 20px; color: var(--yk-green); }
+        .test-connection { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: var(--yk-blue); font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 0; margin-top: 0.5rem; font-family: inherit; }
+        .test-connection:hover { text-decoration: underline; }
+        .test-connection svg { width: 16px; height: 16px; }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--yk-bg-light);
-            color: var(--yk-text-primary);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* ========================== Navigation ========================== */
-        .nav {
-            background: var(--yk-blue);
-            padding: 0 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 64px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            color: var(--yk-white);
-        }
-
-        .nav-brand-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--yk-white);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .nav-brand-icon svg { width: 22px; height: 22px; color: var(--yk-blue); }
-        .nav-brand-text { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.3px; }
-
-        .nav-links { display: flex; align-items: center; gap: 6px; list-style: none; }
-        .nav-links a {
-            color: rgba(255, 255, 255, 0.85);
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-        .nav-links a:hover { background: rgba(255, 255, 255, 0.15); color: var(--yk-white); }
-        .nav-links a.active { background: rgba(255, 255, 255, 0.2); color: var(--yk-white); }
-
-        /* ========================== Main Container ========================== */
-        .main-container {
-            max-width: 640px;
-            margin: 0 auto;
-            padding: 2rem;
-            width: 100%;
-            flex: 1;
-        }
-
-        /* ========================== Header ========================== */
-        .page-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .page-header h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: var(--yk-blue);
-            margin-bottom: 0.5rem;
-        }
-
-        .page-header p {
-            color: var(--yk-text-secondary);
-            font-size: 0.95rem;
-        }
-
-        /* ========================== Card ========================== */
-        .settings-card {
-            background: var(--yk-white);
-            border-radius: var(--yk-radius);
-            box-shadow: var(--yk-shadow);
-            padding: 2rem;
-        }
-
-        /* ========================== Form ========================== */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--yk-text-primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .form-group .hint {
-            display: block;
-            font-size: 0.8rem;
-            color: var(--yk-text-muted);
-            margin-bottom: 0.5rem;
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1.5px solid var(--yk-border);
-            border-radius: var(--yk-radius-sm);
-            font-family: 'Ubuntu', sans-serif;
-            font-size: 0.9rem;
-            color: var(--yk-text-primary);
-            transition: border-color 0.2s ease;
-            background: var(--yk-white);
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--yk-blue);
-            box-shadow: 0 0 0 3px rgba(0, 73, 144, 0.1);
-        }
-
+        /* ========================== Forms & Inputs ========================== */
+        .form-group input, .form-group select { width: 100%; padding: 0.75rem 1rem; border: 1.5px solid var(--yk-border); border-radius: var(--yk-radius-sm); font-family: 'Ubuntu', sans-serif; font-size: 0.9rem; color: var(--yk-text-primary); transition: border-color 0.2s ease; background: var(--yk-white); }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--yk-blue); box-shadow: 0 0 0 3px rgba(0, 73, 144, 0.1); }
         .form-group input::placeholder { color: var(--yk-text-muted); }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
+        .form-group .hint { display: block; font-size: 0.8rem; color: var(--yk-text-muted); margin-bottom: 0.5rem; line-height: 1.4; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
         /* ========================== Buttons ========================== */
-        .btn-group {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 2rem;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 24px;
-            border: none;
-            border-radius: var(--yk-radius-sm);
-            font-family: 'Ubuntu', sans-serif;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-        }
-
-        .btn-primary {
-            background: var(--yk-blue);
-            color: var(--yk-white);
-            flex: 1;
-        }
+        .btn-group { display: flex; gap: 0.75rem; margin-top: 2rem; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border: none; border-radius: var(--yk-radius-sm); font-family: 'Ubuntu', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-decoration: none; }
+        .btn-primary { background: var(--yk-blue); color: var(--yk-white); flex: 1; }
         .btn-primary:hover { background: var(--yk-blue-hover); }
         .btn-primary:disabled { background: var(--yk-text-muted); cursor: default; }
-
-        .btn-secondary {
-            background: var(--yk-bg-section);
-            color: var(--yk-text-primary);
-            border: 1.5px solid var(--yk-border);
-        }
+        .btn-secondary { background: var(--yk-bg-section); color: var(--yk-text-primary); border: 1.5px solid var(--yk-border); padding: 12px 24px; }
         .btn-secondary:hover { background: var(--yk-border); }
         .btn-secondary:disabled { opacity: 0.5; cursor: default; }
-
-        .btn-success {
-            background: var(--yk-green);
-            color: var(--yk-white);
-            flex: 1;
-        }
-
         .btn svg { width: 18px; height: 18px; }
 
         /* ========================== Status Messages ========================== */
-        .status-msg {
-            padding: 0.75rem 1rem;
-            border-radius: var(--yk-radius-sm);
-            font-size: 0.85rem;
-            margin-top: 1rem;
-            display: none;
-        }
-        .status-msg.success {
-            display: block;
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status-msg.error {
-            display: block;
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .status-msg.info {
-            display: block;
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
+        .status-msg { padding: 0.75rem 1rem; border-radius: var(--yk-radius-sm); font-size: 0.85rem; margin-top: 1rem; display: none; }
+        .status-msg.success { display: block; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-msg.error { display: block; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status-msg.info { display: block; background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
 
-        /* ========================== Config Path ========================== */
-        .config-path {
-            margin-top: 1.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--yk-border);
-            font-size: 0.8rem;
-            color: var(--yk-text-muted);
-        }
-        .config-path code {
-            background: var(--yk-bg-section);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.78rem;
-        }
-
-        /* ========================== Footer ========================== */
-        .footer {
-            margin-top: auto;
-            background: var(--yk-blue-dark);
-            color: rgba(255, 255, 255, 0.6);
-            text-align: center;
-            padding: 1.5rem 2rem;
-            font-size: 0.8rem;
-        }
-
-        /* ========================== Responsive ========================== */
-        @media (max-width: 768px) {
-            .nav-links { display: none; }
-            .main-container { padding: 1rem; }
-            .form-row { grid-template-columns: 1fr; }
-        }
-        /* ========================== Prompt Tabs ========================== */
-        .prompt-tab {
-            padding: 8px 16px;
-            border: 1.5px solid var(--yk-border);
-            border-radius: var(--yk-radius-sm);
-            background: var(--yk-bg-section);
-            color: var(--yk-text-secondary);
-            font-family: 'Ubuntu', sans-serif;
-            font-size: 0.82rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
+        /* ========================== Config Path & Tabs ========================== */
+        .config-path { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--yk-border); font-size: 0.8rem; color: var(--yk-text-muted); }
+        .config-path code { background: var(--yk-bg-section); padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.78rem; }
+        .prompt-tab { padding: 8px 16px; border: 1.5px solid var(--yk-border); border-radius: var(--yk-radius-sm); background: var(--yk-bg-section); color: var(--yk-text-secondary); font-family: 'Ubuntu', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
         .prompt-tab:hover { background: var(--yk-border); }
-        .prompt-tab.active {
-            background: var(--yk-blue);
-            color: var(--yk-white);
-            border-color: var(--yk-blue);
+        .prompt-tab.active { background: var(--yk-blue); color: var(--yk-white); border-color: var(--yk-blue); }
+        
+        @media (max-width: 768px) {
+            .form-row { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-<!-- ========================== Navigation ========================== -->
-<nav class="nav">
-    <a href="/" class="nav-brand">
-        <div class="nav-brand-icon">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/>
-            </svg>
-        </div>
-        <span class="nav-brand-text">JVM Diagnostics</span>
-    </a>
-    <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        <li><a href="/heap">Heap Dump</a></li>
-        <li><a href="/thread-dump">Thread Dump</a></li>
-        <li><a href="/gc-log">GC Log</a></li>
-        <li><a href="/settings" class="active">⚙ Settings</a></li>
-    </ul>
-</nav>
+<!-- Navigation -->
+<nav th:replace="~{fragments :: nav('settings')}"></nav>
 
 <!-- ========================== Main Content ========================== -->
 <div class="main-container">
@@ -366,7 +117,7 @@
         <div class="btn-group">
             <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
-                Save & Continue
+                Save &amp; Continue
             </button>
             <button class="btn btn-secondary" id="testBtn" onclick="testConnection()" disabled>
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728M12 12v.01"/></svg>
@@ -412,11 +163,10 @@
     </div>
 </div>
 
-<footer class="footer">
-    JVM Diagnostics Analyzer &middot; Spring Boot + Eclipse MAT + Spring AI
-</footer>
+<footer th:replace="~{fragments :: footer}"></footer>
 
 <script>
+/*<![CDATA[*/
     const apiKeyInput = document.getElementById('apiKey');
     const baseUrlInput = document.getElementById('baseUrl');
     const modelInput = document.getElementById('model');
@@ -632,6 +382,7 @@
 
     // Load first prompt tab
     switchPromptTab('heap-dump');
+/*]]>*/
 </script>
 </body>
 </html>

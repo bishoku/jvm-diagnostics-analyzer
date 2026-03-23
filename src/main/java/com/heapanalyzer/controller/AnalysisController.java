@@ -4,11 +4,14 @@ import com.heapanalyzer.model.AnalysisRecord;
 import com.heapanalyzer.model.AnalysisState;
 import com.heapanalyzer.model.AnalysisStatus;
 import com.heapanalyzer.model.AnalysisType;
+import com.heapanalyzer.model.McpLogEntry;
+import com.heapanalyzer.service.McpLogService;
 import com.heapanalyzer.service.AnalysisHistoryService;
 import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.ConfigService;
 import com.heapanalyzer.service.FileStorageService;
 import com.heapanalyzer.service.MatDownloadService;
+import com.heapanalyzer.service.McpSessionManager;
 import com.heapanalyzer.service.SpringAiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,14 +23,16 @@ import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.ai.retry.TransientAiException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * Handles the web UI and REST API for JVM diagnostic analysis
- * (heap dumps, thread dumps, and GC logs).
+ * (heap dumps, thread dumps, GC logs, and MCP server).
  */
 @Controller
 public class AnalysisController {
@@ -40,19 +45,25 @@ public class AnalysisController {
     private final ConfigService configService;
     private final SpringAiService springAiService;
     private final MatDownloadService matDownloadService;
+    private final McpSessionManager mcpSessionManager;
+    private final McpLogService mcpLogService;
 
     public AnalysisController(FileStorageService fileStorageService,
                               AnalysisService analysisService,
                               AnalysisHistoryService historyService,
                               ConfigService configService,
                               SpringAiService springAiService,
-                              MatDownloadService matDownloadService) {
+                              MatDownloadService matDownloadService,
+                              McpSessionManager mcpSessionManager,
+                              McpLogService mcpLogService) {
         this.fileStorageService = fileStorageService;
         this.analysisService = analysisService;
         this.historyService = historyService;
         this.configService = configService;
         this.springAiService = springAiService;
         this.matDownloadService = matDownloadService;
+        this.mcpSessionManager = mcpSessionManager;
+        this.mcpLogService = mcpLogService;
     }
 
     // ========================== Page Routes ==========================
@@ -80,6 +91,35 @@ public class AnalysisController {
     @GetMapping("/gc-log")
     public String gcLog() {
         return "gc-log";
+    }
+
+    /** MCP Server page — upload heap dumps for interactive MCP querying. */
+    @GetMapping("/mcp")
+    public String mcpPage() {
+        return "mcp";
+    }
+
+    /** MCP Logs page — view live JSON-RPC request and response streaming. */
+    @GetMapping("/mcp/{sessionId}/logs")
+    public String mcpLogsPage(@PathVariable("sessionId") String sessionId, Model model) {
+        if (mcpSessionManager.getSession(sessionId) == null) {
+            return "redirect:/mcp";
+        }
+        model.addAttribute("sessionId", sessionId);
+        return "mcp-logs";
+    }
+
+    /** Stream incoming JSON-RPC traffic via SSE for the specified session. */
+    @GetMapping("/api/mcp/{sessionId}/logs/stream")
+    public SseEmitter streamMcpLogs(@PathVariable("sessionId") String sessionId) {
+        return mcpLogService.subscribe(sessionId);
+    }
+
+    /** Fetch recent log history for initial UI population. */
+    @GetMapping("/api/mcp/{sessionId}/logs/recent")
+    @ResponseBody
+    public ResponseEntity<List<McpLogEntry>> getRecentLogs(@PathVariable("sessionId") String sessionId) {
+        return ResponseEntity.ok(mcpLogService.getRecentLogs(sessionId));
     }
 
     /** View a saved analysis result. */
@@ -380,6 +420,72 @@ public class AnalysisController {
             return ResponseEntity.ok(Map.of("message", "Record deleted."));
         }
         return ResponseEntity.notFound().build();
+    }
+
+    // ========================== MCP Endpoints ==========================
+
+    /** Upload a heap dump (.hprof) to start an MCP interactive session. */
+    @PostMapping("/api/mcp/upload")
+    @ResponseBody
+    public ResponseEntity<?> uploadForMcp(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No file provided."));
+        }
+
+        String fileName = file.getOriginalFilename() != null
+                ? file.getOriginalFilename() : "unknown.hprof";
+
+        if (!fileName.toLowerCase().endsWith(".hprof")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Expected a .hprof file."));
+        }
+
+        String sessionId = UUID.randomUUID().toString();
+
+        try {
+            Path savedPath = fileStorageService.store(file, "mcp-" + sessionId);
+            mcpSessionManager.createSession(sessionId, fileName, savedPath, file.getSize());
+
+            return ResponseEntity.ok(Map.of(
+                    "sessionId", sessionId,
+                    "fileName", fileName,
+                    "message", "Heap dump uploaded. Parsing started — tools will be available once parsing completes."
+            ));
+        } catch (Exception e) {
+            log.error("MCP upload failed", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Upload failed: " + e.getMessage()));
+        }
+    }
+
+    /** Returns MCP server and session status. */
+    @GetMapping("/api/mcp/status")
+    @ResponseBody
+    public ResponseEntity<?> mcpStatus() {
+        var sessionInfo = mcpSessionManager.getStatusInfo();
+
+        // Build connection info
+        String serverUrl = "http://localhost:" + System.getProperty("server.port", "8080");
+        Map<String, Object> response = new java.util.LinkedHashMap<>(sessionInfo);
+        response.put("mcpEnabled", true);
+        response.put("mcpProtocol", "SSE");
+        response.put("mcpEndpoint", serverUrl + "/sse");
+        response.put("mcpMessageEndpoint", serverUrl + "/mcp/message");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /** Closes the active MCP session and cleans up files. */
+    @DeleteMapping("/api/mcp/session")
+    @ResponseBody
+    public ResponseEntity<?> closeMcpSession() {
+        var session = mcpSessionManager.getActiveSession();
+        if (session == null) {
+            return ResponseEntity.ok(Map.of("message", "No active session."));
+        }
+
+        mcpSessionManager.closeSession(session.getSessionId());
+        return ResponseEntity.ok(Map.of("message", "Session closed and files cleaned up."));
     }
 
     // ========================== Internals ==========================
