@@ -13,7 +13,7 @@
 
     <groupId>com.bishokudev</groupId>
     <artifactId>jvm-diagnostics-analyzer</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
     <name>JVM Diagnostics Analyzer</name>
     <description>AI-powered JVM diagnostics: heap dumps, thread dumps, and GC log analysis</description>
 
