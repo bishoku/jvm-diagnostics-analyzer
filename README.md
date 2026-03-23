@@ -1,6 +1,6 @@
 # 🔬 JVM Diagnostics Analyzer
 
-AI-powered JVM diagnostics tool — analyze **heap dumps**, **thread dumps**, and **GC logs** with actionable insights from AI.
+AI-powered JVM diagnostics tool — analyze **heap dumps**, **thread dumps**, and **GC logs** with actionable insights from AI. Includes an **MCP server** for AI agent integration and a **built-in AI chat** for conversational heap dump analysis.
 
 Built with **Spring Boot 4**, **Java 25**, **Eclipse MAT**, and **Spring AI**.
 
@@ -24,6 +24,17 @@ Built with **Spring Boot 4**, **Java 25**, **Eclipse MAT**, and **Spring AI**.
 - **Multi-collector support** — G1GC, ZGC, Shenandoah, CMS, Parallel, Serial
 - **Pause time percentiles** — P50, P95, P99 analysis with anomaly detection
 - **AI tuning recommendations** — Specific JVM flag suggestions and heap sizing advice
+
+### 🔌 MCP Server (Model Context Protocol)
+- **SSE-based MCP server** — Expose heap dump tools to any AI agent (Claude Desktop, Cursor, Windsurf, etc.)
+- **7 analysis tools** — `get_heap_summary`, `get_leak_suspects`, `get_class_histogram`, `get_dominator_tree`, `get_top_consumers`, `run_oql_query`, `get_thread_stacks`
+- **Live tool activity log** — Real-time visibility into agent tool calls on the MCP page
+
+### 💬 Built-in AI Chat
+- **Conversational heap dump analysis** — Ask questions in natural language on the MCP page
+- **Real-time streaming** — Token-by-token LLM responses with automatic tool calling
+- **Conversation memory** — Context maintained across messages via Spring AI `MessageChatMemoryAdvisor`
+- **Collapsible debug info** — Inspect tool calls and parameters inline
 
 ### Common
 - **Async pipeline** — Upload, analysis, and AI generation run asynchronously with live status polling
@@ -180,6 +191,20 @@ Open **http://localhost:8080**.
 3. Wait for pause time analysis + AI insights
 4. Review GC tuning recommendations and heap sizing advice
 
+### MCP Server (for AI Agents)
+
+1. Navigate to **MCP** from the landing page
+2. Upload a `.hprof` file — the MCP server starts automatically
+3. Connect your AI agent to `http://localhost:8080/mcp/sse`
+4. The agent can now call heap analysis tools directly
+
+### Built-in AI Chat
+
+1. Navigate to **MCP** from the landing page
+2. Upload a `.hprof` file and wait for parsing
+3. Use the chat panel at the bottom to ask questions about the heap dump
+4. The AI streams responses in real-time, calling analysis tools as needed
+
 ---
 
 ## Project Structure
@@ -195,11 +220,16 @@ src/main/java/com/heapanalyzer/
 │   ├── AnalysisState.java                  # Per-job state holder
 │   ├── AnalysisStatus.java                 # Lifecycle enum
 │   └── AnalysisType.java                   # HEAP_DUMP | THREAD_DUMP | GC_LOG
+├── mcp/
+│   └── HeapDumpMcpTools.java               # MCP tool definitions (7 tools)
 └── service/
     ├── AnalysisService.java                # Async pipeline orchestrator
     ├── FileStorageService.java             # Stream-to-disk uploads
     ├── GcLogAnalysisService.java           # GC log parser
+    ├── HeapDumpChatService.java            # AI chat with streaming & memory
     ├── MatAnalysisService.java             # Eclipse MAT subprocess
+    ├── MatQueryService.java                # MAT headless query execution
+    ├── McpSessionManager.java              # MCP session lifecycle
     ├── SpringAiService.java                # OpenAI via Spring AI
     └── ThreadDumpAnalysisService.java      # Thread dump parser
 
@@ -207,7 +237,8 @@ src/main/resources/templates/
 ├── index.html                              # Landing page (tool selection)
 ├── heap.html                               # Heap dump upload & results
 ├── thread-dump.html                        # Thread dump upload & results
-└── gc-log.html                             # GC log upload & results
+├── gc-log.html                             # GC log upload & results
+└── mcp.html                                # MCP server + AI chat page
 ```
 
 ---
@@ -220,9 +251,13 @@ src/main/resources/templates/
 | `GET` | `/heap` | Heap dump analysis page |
 | `GET` | `/thread-dump` | Thread dump analysis page |
 | `GET` | `/gc-log` | GC log analysis page |
+| `GET` | `/mcp` | MCP server + AI chat page |
 | `POST` | `/api/heap/upload` | Upload `.hprof` file |
 | `POST` | `/api/thread-dump/upload` | Upload thread dump |
 | `POST` | `/api/gc-log/upload` | Upload GC log |
+| `POST` | `/api/mcp/upload` | Upload `.hprof` for MCP |
+| `POST` | `/api/mcp/chat` | AI chat (SSE stream) |
+| `GET` | `/api/mcp/status` | MCP session status |
 | `GET` | `/api/analysis/{id}/status` | Poll analysis status and results |
 
 ---
@@ -287,7 +322,7 @@ kubectl cp <pod>:/tmp/heapdump.hprof ./heapdump.hprof
 |---|---|---|
 | Java | 25 | Runtime |
 | Spring Boot | 4.0.3 | Application framework |
-| Spring AI | 1.1.2 | AI integration (OpenAI) |
+| Spring AI | 2.0.0-M3 | AI integration, MCP server, chat memory |
 | Eclipse MAT | 1.16.1 | Heap dump analysis |
 | Thymeleaf | — | Server-side templating |
 

@@ -7,6 +7,7 @@ import com.heapanalyzer.service.AnalysisHistoryService;
 import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.ConfigService;
 import com.heapanalyzer.service.FileStorageService;
+import com.heapanalyzer.service.HeapDumpChatService;
 import com.heapanalyzer.service.MatDownloadService;
 import com.heapanalyzer.service.McpLogService;
 import com.heapanalyzer.service.McpSessionManager;
@@ -51,6 +52,14 @@ class AnalysisControllerTest {
 
     @MockitoBean
     private McpLogService mcpLogService;
+
+    @MockitoBean
+    private HeapDumpChatService chatService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        when(configService.isConfigured()).thenReturn(true);
+    }
 
     @Test
     void getStatus_WhenFound_Returns200AndStatus() throws Exception {

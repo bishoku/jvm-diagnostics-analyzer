@@ -233,6 +233,13 @@ public class SpringAiService {
     }
 
     /**
+     * Returns the underlying ChatClient for direct use (e.g., by the chat service).
+     */
+    public ChatClient getChatClient() {
+        return chatClient;
+    }
+
+    /**
      * Returns the effective prompt for the given type — custom if set, otherwise default.
      */
     public String getEffectivePrompt(String promptType) {

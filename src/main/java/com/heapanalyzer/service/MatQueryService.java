@@ -369,7 +369,9 @@ public class MatQueryService {
 
         String output;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            output = reader.lines().collect(Collectors.joining("\n"));
+            output = reader.lines()
+                    .filter(line -> !isNoiseLine(line))
+                    .collect(Collectors.joining("\n"));
         }
 
         boolean finished = process.waitFor(queryTimeoutMinutes, TimeUnit.MINUTES);
@@ -388,6 +390,22 @@ public class MatQueryService {
         }
 
         return output;
+    }
+
+    /**
+     * Returns true for lines that are JVM warnings, MAT progress indicators,
+     * or other Eclipse runtime noise — not useful for LLM consumption.
+     */
+    private boolean isNoiseLine(String line) {
+        if (line == null) return true;
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) return false; // keep blank lines for formatting
+        return trimmed.startsWith("WARNING:")
+                || trimmed.startsWith("Task:")
+                || trimmed.matches("^\\[[\\.]+\\]$")           // progress bars like [.........]
+                || trimmed.startsWith("Subtask:")
+                || trimmed.startsWith("Please consider reporting")
+                || trimmed.startsWith("Use --enable-native-access");
     }
 
     // ========================== Utility methods ==========================

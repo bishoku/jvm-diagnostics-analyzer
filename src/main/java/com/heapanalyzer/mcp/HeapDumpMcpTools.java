@@ -31,8 +31,8 @@ public class HeapDumpMcpTools {
     }
 
     @Tool(name = "get_heap_summary",
-          description = "Get heap dump overview: total heap size, object count, class count, class loaders, GC roots, JVM system properties. " +
-                        "Returns: heapSize, objectCount, classCount, classLoaderCount, gcRoots, unreachableObjects, systemProperties(java.version, os.name, etc)")
+          description = "Get heap dump overview: total heap size, object count, class count, GC roots, and key JVM system properties. " +
+                        "Use first to understand the overall heap state and JVM configuration.")
     public String getHeapSummary() {
         HeapDumpSession session = requireActiveSession();
         try {
@@ -46,8 +46,7 @@ public class HeapDumpMcpTools {
 
     @Tool(name = "get_leak_suspects",
           description = "Get memory leak suspects with accumulation points, retained heap sizes, and shortest paths to GC roots. " +
-                        "Returns: ranked suspects with className, retainedHeap bytes, percentage of total heap, accumulation point path. " +
-                        "Use when: investigating OutOfMemoryError or unexpectedly high memory usage")
+                        "Use when investigating OutOfMemoryError or unexpectedly high memory usage.")
     public String getLeakSuspects() {
         HeapDumpSession session = requireActiveSession();
         try {
@@ -60,13 +59,11 @@ public class HeapDumpMcpTools {
     }
 
     @Tool(name = "get_class_histogram",
-          description = "Get top classes ranked by retained heap size. " +
-                        "Params: topN(default 30, max 200), pattern(Java regex e.g. 'com\\.myapp\\..*'). " +
-                        "Returns per class: className, objectCount, shallowHeap, retainedHeap. " +
-                        "Use when: identifying which classes consume the most memory")
+          description = "Get top classes ranked by retained heap size, with optional regex filter. " +
+                        "Use to identify which classes consume the most memory or to inspect a specific package.")
     public String getClassHistogram(
-            @ToolParam(description = "Number of top classes to return (default 30)") Integer topN,
-            @ToolParam(description = "Java regex to filter class names, e.g. 'com\\.myapp\\..*'") String pattern) {
+            @ToolParam(description = "Number of top classes to return (default 30, max 200)") Integer topN,
+            @ToolParam(description = "Optional Java regex to filter class names, e.g. 'com\\.myapp\\..*'") String pattern) {
         HeapDumpSession session = requireActiveSession();
         try {
             session.touch();
@@ -79,12 +76,10 @@ public class HeapDumpMcpTools {
     }
 
     @Tool(name = "get_dominator_tree",
-          description = "Get top objects that dominate (retain) the most memory. " +
-                        "Params: topN(default 20, max 100). " +
-                        "Returns per object: className, objectAddress, shallowHeap, retainedHeap, percentage. " +
-                        "Use when: finding the single largest memory-holding objects")
+          description = "Get the single largest memory-holding objects (dominators). " +
+                        "Use to find individual objects that retain the most memory.")
     public String getDominatorTree(
-            @ToolParam(description = "Number of top dominator objects to return (default 20)") Integer topN) {
+            @ToolParam(description = "Number of top dominator objects to return (default 20, max 100)") Integer topN) {
         HeapDumpSession session = requireActiveSession();
         try {
             session.touch();
@@ -98,8 +93,7 @@ public class HeapDumpMcpTools {
 
     @Tool(name = "get_top_consumers",
           description = "Get biggest memory consumers grouped by class, classloader, and package. " +
-                        "Returns three ranked lists: topByClass(className, retainedHeap), topByClassLoader, topByPackage. " +
-                        "Use when: getting a high-level breakdown of memory distribution")
+                        "Use for a high-level breakdown of where memory is allocated.")
     public String getTopConsumers() {
         HeapDumpSession session = requireActiveSession();
         try {
@@ -112,11 +106,10 @@ public class HeapDumpMcpTools {
     }
 
     @Tool(name = "run_oql_query",
-          description = "Execute OQL (Object Query Language) query against the heap dump. " +
+          description = "Execute an OQL (Object Query Language) query against the heap dump. Returns up to 100 rows. " +
                         "Syntax: SELECT [fields] FROM [class] [WHERE condition]. " +
-                        "Examples: 'SELECT toString(s), s.@retainedHeapSize FROM java.lang.String s WHERE s.@retainedHeapSize > 1000000', " +
-                        "'SELECT c.name.toString(), c.@retainedHeapSize FROM java.lang.Class c WHERE c.@retainedHeapSize > 500000'. " +
-                        "Returns up to 100 rows. Use when: custom queries not covered by other tools")
+                        "Example: 'SELECT toString(s), s.@retainedHeapSize FROM java.lang.String s WHERE s.@retainedHeapSize > 1000000'. " +
+                        "Use for custom analysis not covered by other tools (e.g. inspecting specific objects, finding duplicates, collection sizes).")
     public String runOqlQuery(
             @ToolParam(description = "OQL query string starting with SELECT") String query) {
         HeapDumpSession session = requireActiveSession();
@@ -130,9 +123,8 @@ public class HeapDumpMcpTools {
     }
 
     @Tool(name = "get_thread_stacks",
-          description = "Get thread stack traces from the heap dump with local variables and retained sizes at dump time. " +
-                        "Returns per thread: threadName, state, stackFrames with localVars and retainedHeap. " +
-                        "Use when: investigating deadlocks, blocked threads, or thread-local memory leaks")
+          description = "Get thread stack traces from the heap dump with local variables and retained heap sizes. " +
+                        "Use to investigate deadlocks, blocked threads, or thread-local memory leaks.")
     public String getThreadStacks() {
         HeapDumpSession session = requireActiveSession();
         try {

@@ -5,6 +5,7 @@ import com.heapanalyzer.model.AnalysisState;
 import com.heapanalyzer.model.AnalysisStatus;
 import com.heapanalyzer.model.AnalysisType;
 import com.heapanalyzer.model.McpLogEntry;
+import com.heapanalyzer.service.HeapDumpChatService;
 import com.heapanalyzer.service.McpLogService;
 import com.heapanalyzer.service.AnalysisHistoryService;
 import com.heapanalyzer.service.AnalysisService;
@@ -47,6 +48,7 @@ public class AnalysisController {
     private final MatDownloadService matDownloadService;
     private final McpSessionManager mcpSessionManager;
     private final McpLogService mcpLogService;
+    private final HeapDumpChatService chatService;
 
     public AnalysisController(FileStorageService fileStorageService,
                               AnalysisService analysisService,
@@ -55,7 +57,8 @@ public class AnalysisController {
                               SpringAiService springAiService,
                               MatDownloadService matDownloadService,
                               McpSessionManager mcpSessionManager,
-                              McpLogService mcpLogService) {
+                              McpLogService mcpLogService,
+                              HeapDumpChatService chatService) {
         this.fileStorageService = fileStorageService;
         this.analysisService = analysisService;
         this.historyService = historyService;
@@ -64,6 +67,7 @@ public class AnalysisController {
         this.matDownloadService = matDownloadService;
         this.mcpSessionManager = mcpSessionManager;
         this.mcpLogService = mcpLogService;
+        this.chatService = chatService;
     }
 
     // ========================== Page Routes ==========================
@@ -484,8 +488,33 @@ public class AnalysisController {
             return ResponseEntity.ok(Map.of("message", "No active session."));
         }
 
+        chatService.clearHistory(session.getSessionId());
         mcpSessionManager.closeSession(session.getSessionId());
         return ResponseEntity.ok(Map.of("message", "Session closed and files cleaned up."));
+    }
+
+    /** Chat with the active heap dump via SSE streaming. */
+    @PostMapping("/api/mcp/chat")
+    public SseEmitter chatWithHeapDump(@RequestBody Map<String, String> body) {
+        String message = body.get("message");
+        if (message == null || message.isBlank()) {
+            SseEmitter emitter = new SseEmitter(5000L);
+            Thread.startVirtualThread(() -> {
+                try {
+                    emitter.send(SseEmitter.event().name("error")
+                            .data("{\"message\":\"Mesaj boş olamaz.\"}"));
+                    emitter.complete();
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
+            });
+            return emitter;
+        }
+
+        // 5-minute timeout for long-running tool calls
+        SseEmitter emitter = new SseEmitter(300_000L);
+        chatService.streamChat(message, emitter);
+        return emitter;
     }
 
     // ========================== Internals ==========================
