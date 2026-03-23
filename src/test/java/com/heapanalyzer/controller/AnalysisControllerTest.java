@@ -8,14 +8,15 @@ import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.ConfigService;
 import com.heapanalyzer.service.FileStorageService;
 import com.heapanalyzer.service.MatDownloadService;
+import com.heapanalyzer.service.McpLogService;
+import com.heapanalyzer.service.McpSessionManager;
 import com.heapanalyzer.service.SpringAiService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +45,12 @@ class AnalysisControllerTest {
 
     @MockitoBean
     private MatDownloadService matDownloadService;
+
+    @MockitoBean
+    private McpSessionManager mcpSessionManager;
+
+    @MockitoBean
+    private McpLogService mcpLogService;
 
     @Test
     void getStatus_WhenFound_Returns200AndStatus() throws Exception {
