@@ -203,6 +203,17 @@ public class SpringAiService {
                         .requestFactory(requestFactory);
 
                 apiBuilder.restClientBuilder(restClientBuilder);
+
+                var nettySslContext = io.netty.handler.ssl.SslContextBuilder.forClient()
+                        .trustManager(io.netty.handler.ssl.util.InsecureTrustManagerFactory.INSTANCE)
+                        .build();
+                var reactorHttpClient = reactor.netty.http.client.HttpClient.create()
+                        .secure(t -> t.sslContext(nettySslContext));
+                var clientConnector = new org.springframework.http.client.reactive.ReactorClientHttpConnector(reactorHttpClient);
+                var webClientBuilder = org.springframework.web.reactive.function.client.WebClient.builder()
+                        .clientConnector(clientConnector);
+
+                apiBuilder.webClientBuilder(webClientBuilder);
             } catch (Exception e) {
                 log.error("Failed to configure insecure TLS: {}", e.getMessage());
                 throw new RuntimeException("Failed to configure insecure TLS", e);
