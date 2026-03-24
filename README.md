@@ -78,7 +78,7 @@ docker run -d \
   --name jvm-diagnostics \
   -p 8080:8080 \
   -v jvm-uploads:/data/uploads \
-  barishoku/jvm-dump-analyzer:0.0.2
+  barishoku/jvm-dump-analyzer:latest
 ```
 
 Open **http://localhost:8080** — you'll be guided through API key setup on first launch.
