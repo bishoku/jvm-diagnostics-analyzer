@@ -592,9 +592,73 @@
         }
 
         /* Chat input area */
+        .chat-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .chat-input-area {
             display: flex;
             gap: 8px;
+        }
+
+        .chat-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--yk-text-muted);
+            padding-left: 4px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--yk-blue);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--yk-blue);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(14px);
         }
 
         .chat-input {
@@ -894,11 +958,20 @@
                 <div class="chat-messages" id="chatMessages">
                     <!-- Messages will be added here -->
                 </div>
-                <div class="chat-input-area">
-                    <input type="text" class="chat-input" id="chatInput"
-                        placeholder="Heap dump hakkında bir soru sorun..."
-                        onkeydown="if(event.key==='Enter' && !event.shiftKey) sendChatMessage()" />
-                    <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Gönder</button>
+                <div class="chat-input-container">
+                    <div class="chat-options">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="streamToggle">
+                            <span class="slider"></span>
+                        </label>
+                        <span>Akışlı yanıtı (stream) etkinleştir</span>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chatInput"
+                            placeholder="Heap dump hakkında bir soru sorun..."
+                            onkeydown="if(event.key==='Enter' && !event.shiftKey) sendChatMessage()" />
+                        <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Gönder</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1228,6 +1301,8 @@
             const message = chatInput.value.trim();
             if (!message || chatStreaming) return;
 
+            const isStreamEnabled = document.getElementById('streamToggle').checked;
+
             addUserMessage(message);
             chatInput.value = '';
             setChatEnabled(false);
@@ -1239,7 +1314,7 @@
             fetch('/api/mcp/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({ message: message, stream: isStreamEnabled })
             }).then(response => {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
