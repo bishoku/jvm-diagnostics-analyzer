@@ -142,18 +142,33 @@ public class MatQueryService {
     /**
      * Returns class histogram sorted by retained heap.
      *
+     * <p>Extracts data from the System Overview ZIP generated during initial parse.
+     * Applies optional topN and pattern filtering on the extracted data.</p>
+     *
      * @param topN    max classes to return (default 30)
      * @param pattern optional class name regex filter
      */
     public String getClassHistogram(Path hprofPath, int topN, String pattern)
             throws IOException, InterruptedException {
 
-        String output = runMatCommand(hprofPath, "histogram");
-
+        Path directory = hprofPath.getParent();
         StringBuilder result = new StringBuilder();
         result.append("=== CLASS HISTOGRAM (Top ").append(topN).append(") ===\n\n");
 
-        String[] lines = output.split("\n");
+        String rawText = extractFromOverviewZip(directory, "histogram", "class_statistics");
+
+        if (rawText.isEmpty()) {
+            // Fallback: try the overview index page which often contains top class data
+            rawText = extractFromOverviewZip(directory, "index");
+        }
+
+        if (rawText.isEmpty()) {
+            result.append("No class histogram data available. The System Overview report may not have been generated.\n");
+            return result.toString();
+        }
+
+        // Apply topN and pattern filtering
+        String[] lines = rawText.split("\n");
         int count = 0;
         Pattern filterPattern = (pattern != null && !pattern.isBlank())
                 ? Pattern.compile(pattern, Pattern.CASE_INSENSITIVE) : null;
@@ -169,7 +184,7 @@ public class MatQueryService {
                 continue;
             }
 
-            // Apply filter
+            // Apply pattern filter
             if (filterPattern != null && !filterPattern.matcher(trimmed).find()) {
                 continue;
             }
@@ -189,22 +204,38 @@ public class MatQueryService {
     /**
      * Returns dominator tree — objects dominating the most retained memory.
      *
+     * <p>Extracts data from the System Overview ZIP generated during initial parse.</p>
+     *
      * @param topN max dominator objects to return (default 20)
      */
     public String getDominatorTree(Path hprofPath, int topN)
             throws IOException, InterruptedException {
 
-        String output = runMatCommand(hprofPath, "dominator_tree");
-
+        Path directory = hprofPath.getParent();
         StringBuilder result = new StringBuilder();
         result.append("=== DOMINATOR TREE (Top ").append(topN).append(") ===\n\n");
-        result.append(truncateLines(output, topN + 5)); // +5 for headers
+
+        String rawText = extractFromOverviewZip(directory, "dominator", "biggest_objects");
+
+        if (rawText.isEmpty()) {
+            // Fallback: try the overview index to get some object-level data
+            rawText = extractFromOverviewZip(directory, "index");
+        }
+
+        if (rawText.isEmpty()) {
+            result.append("No dominator tree data available. The System Overview report may not have been generated.\n");
+            return result.toString();
+        }
+
+        result.append(truncateLines(rawText, topN + 5)); // +5 for headers
 
         return result.toString();
     }
 
     /**
      * Returns top memory consumers grouped by class, classloader, and package.
+     *
+     * <p>Extracts data from the System Overview ZIP generated during initial parse.</p>
      */
     public String getTopConsumers(Path hprofPath) throws IOException, InterruptedException {
         Path directory = hprofPath.getParent();
@@ -212,26 +243,40 @@ public class MatQueryService {
 
         result.append("=== TOP MEMORY CONSUMERS ===\n\n");
 
-        // Try to extract from System Overview ZIP first (has top_components)
-        Path overviewZip = findZip(directory, "*_System_Overview.zip");
-        if (overviewZip != null) {
-            try (ZipFile zip = new ZipFile(overviewZip.toFile())) {
-                ZipEntry entry = findEntryContaining(zip, "top_component");
-                if (entry == null) entry = findEntryContaining(zip, "biggest_objects");
-                if (entry == null) entry = findEntryContaining(zip, "package");
+        String rawText = extractFromOverviewZip(directory,
+                "top_component", "biggest_objects", "package");
 
+        if (rawText.isEmpty()) {
+            // Fallback: try the overview index
+            rawText = extractFromOverviewZip(directory, "index");
+        }
+
+        if (rawText.isEmpty()) {
+            result.append("No top consumer data available. The System Overview report may not have been generated.\n");
+            return result.toString();
+        }
+
+        result.append(rawText);
+        return truncate(result.toString(), 8000);
+    }
+
+    /**
+     * Extracts text content from the System Overview ZIP by trying multiple entry name keywords.
+     * Returns the first matching entry's content converted to text, or empty string if none found.
+     */
+    private String extractFromOverviewZip(Path directory, String... keywords) throws IOException {
+        Path overviewZip = findZip(directory, "*_System_Overview.zip");
+        if (overviewZip == null) return "";
+
+        try (ZipFile zip = new ZipFile(overviewZip.toFile())) {
+            for (String keyword : keywords) {
+                ZipEntry entry = findEntryContaining(zip, keyword);
                 if (entry != null) {
-                    result.append(htmlToText(readEntry(zip, entry)));
-                    return truncate(result.toString(), 8000);
+                    return htmlToText(readEntry(zip, entry));
                 }
             }
         }
-
-        // Fallback: run histogram and group
-        String output = runMatCommand(hprofPath, "histogram");
-        result.append(truncateLines(output, 30));
-
-        return truncate(result.toString(), 8000);
+        return "";
     }
 
     /**
