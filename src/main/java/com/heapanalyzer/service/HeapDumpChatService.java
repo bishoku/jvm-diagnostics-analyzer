@@ -19,12 +19,17 @@ import java.util.Map;
 /**
  * Chat service that enables conversational heap dump analysis.
  *
- * <p>Uses the same ChatClient as the rest of the app, but binds the MCP tools
+ * <p>
+ * Uses the same ChatClient as the rest of the app, but binds the MCP tools
  * directly (no SSE round-trip) so the LLM can invoke heap analysis tools
- * as part of the conversation.</p>
+ * as part of the conversation.
+ * </p>
  *
- * <p>Conversation history is managed by Spring AI's {@link MessageChatMemoryAdvisor}
- * with an {@link InMemoryChatMemory} backend, keyed by MCP session ID.</p>
+ * <p>
+ * Conversation history is managed by Spring AI's
+ * {@link MessageChatMemoryAdvisor}
+ * with an {@link InMemoryChatMemory} backend, keyed by MCP session ID.
+ * </p>
  */
 @Service
 public class HeapDumpChatService {
@@ -35,17 +40,17 @@ public class HeapDumpChatService {
             You are an expert JVM Performance Engineer. You help users analyze heap dump files
             that have been uploaded to this application.
 
-            CRITICAL: You MUST always respond in Turkish. All your responses must be in Turkish language
+            CRITICAL: You MUST always respond in English. All your responses must be in English language
             and formatted in Markdown (use headers, bullet points, code blocks, tables, etc.).
 
             CORE RULES:
-            - Always respond in Turkish with Markdown formatting.
+            - Always respond in English with Markdown formatting.
             - Base ALL analysis ONLY on data retrieved from the tools — never guess or fabricate.
             - Never invent class names, package names, byte counts, or percentages not in tool output.
             - If no data is available for a section, state that explicitly.
             - Use EXACT values from tool results for any numerical data (retained heap, object count, percentages).
             - Clearly separate observation from interpretation:
-              use "Veriler şunu gösteriyor..." (observation) vs "Bu durumun nedeni..." (interpretation).
+              use "The data shows..." (observation) vs "The reason for this situation is..." (interpretation).
 
             AVAILABLE TOOLS:
             - get_heap_summary: Heap overview (size, object count, class count, JVM properties)
@@ -64,7 +69,7 @@ public class HeapDumpChatService {
             5. Always provide concrete, actionable recommendations.
 
             FIRST MESSAGE:
-            If the user sends a general greeting like "merhaba", briefly introduce yourself and
+            If the user sends a general greeting like "hello", briefly introduce yourself and
             explain how you can help analyze the heap dump. Suggest example questions they can ask.
             """;
 
@@ -76,8 +81,8 @@ public class HeapDumpChatService {
     private final ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
 
     public HeapDumpChatService(SpringAiService springAiService,
-                               HeapDumpMcpTools heapDumpMcpTools,
-                               McpSessionManager mcpSessionManager) {
+            HeapDumpMcpTools heapDumpMcpTools,
+            McpSessionManager mcpSessionManager) {
         this.springAiService = springAiService;
         this.heapDumpMcpTools = heapDumpMcpTools;
         this.mcpSessionManager = mcpSessionManager;
@@ -86,12 +91,14 @@ public class HeapDumpChatService {
     /**
      * Streams a chat response to the given SseEmitter.
      *
-     * <p>SSE event types:
+     * <p>
+     * SSE event types:
      * <ul>
-     *   <li>{@code text} — A chunk of the assistant's text response</li>
-     *   <li>{@code tool_call} — A tool invocation: {@code {"name":"...", "args":"..."}}</li>
-     *   <li>{@code done} — Stream finished</li>
-     *   <li>{@code error} — An error occurred</li>
+     * <li>{@code text} — A chunk of the assistant's text response</li>
+     * <li>{@code tool_call} — A tool invocation:
+     * {@code {"name":"...", "args":"..."}}</li>
+     * <li>{@code done} — Stream finished</li>
+     * <li>{@code error} — An error occurred</li>
      * </ul>
      */
     public void streamChat(String userMessage, SseEmitter emitter) {
@@ -192,13 +199,18 @@ public class HeapDumpChatService {
                 .data(json));
     }
 
-    /** Minimal JSON serialization — avoids pulling in Jackson dependency at the service layer. */
+    /**
+     * Minimal JSON serialization — avoids pulling in Jackson dependency at the
+     * service layer.
+     */
     private String toJson(Map<String, ?> map) {
-        if (map.isEmpty()) return "{}";
+        if (map.isEmpty())
+            return "{}";
         var sb = new StringBuilder("{");
         boolean first = true;
         for (var entry : map.entrySet()) {
-            if (!first) sb.append(",");
+            if (!first)
+                sb.append(",");
             sb.append("\"").append(escapeJson(entry.getKey())).append("\":");
             Object val = entry.getValue();
             if (val instanceof String s) {
