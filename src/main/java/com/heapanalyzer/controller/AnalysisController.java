@@ -495,8 +495,18 @@ public class AnalysisController {
 
     /** Chat with the active heap dump via SSE streaming. */
     @PostMapping("/api/mcp/chat")
-    public SseEmitter chatWithHeapDump(@RequestBody Map<String, String> body) {
-        String message = body.get("message");
+    public SseEmitter chatWithHeapDump(@RequestBody Map<String, Object> body) {
+        String message = (String) body.get("message");
+        boolean stream = false;
+        if (body.containsKey("stream")) {
+            Object streamObj = body.get("stream");
+            if (streamObj instanceof Boolean b) {
+                stream = b;
+            } else if (streamObj instanceof String s) {
+                stream = Boolean.parseBoolean(s);
+            }
+        }
+
         if (message == null || message.isBlank()) {
             SseEmitter emitter = new SseEmitter(5000L);
             Thread.startVirtualThread(() -> {
@@ -513,7 +523,7 @@ public class AnalysisController {
 
         // 5-minute timeout for long-running tool calls
         SseEmitter emitter = new SseEmitter(300_000L);
-        chatService.streamChat(message, emitter);
+        chatService.streamChat(message, emitter, stream);
         return emitter;
     }
 

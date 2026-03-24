@@ -101,11 +101,11 @@ public class HeapDumpChatService {
      * <li>{@code error} — An error occurred</li>
      * </ul>
      */
-    public void streamChat(String userMessage, SseEmitter emitter) {
-        Thread.startVirtualThread(() -> doStreamChat(userMessage, emitter));
+    public void streamChat(String userMessage, SseEmitter emitter, boolean stream) {
+        Thread.startVirtualThread(() -> doStreamChat(userMessage, emitter, stream));
     }
 
-    private void doStreamChat(String userMessage, SseEmitter emitter) {
+    private void doStreamChat(String userMessage, SseEmitter emitter, boolean stream) {
         try {
             ChatClient chatClient = springAiService.getChatClient();
             if (chatClient == null) {
@@ -126,53 +126,72 @@ public class HeapDumpChatService {
             String sessionId = session.getSessionId();
             log.info("[Chat] User message for session {}: {} chars", sessionId, userMessage.length());
 
-            // Real streaming with tool support + Spring AI memory advisor
-            Flux<ChatResponse> responseFlux = chatClient.prompt()
+            var prompt = chatClient.prompt()
                     .system(SYSTEM_PROMPT)
                     .user(userMessage)
                     .tools(heapDumpMcpTools)
                     .toolContext(Map.of("sessionId", sessionId))
                     .advisors(MessageChatMemoryAdvisor.builder(chatMemory)
                             .conversationId(sessionId)
-                            .build())
-                    .stream()
-                    .chatResponse();
+                            .build());
 
             StringBuilder fullResponse = new StringBuilder();
 
-            responseFlux
-                    .doOnNext(chatResponse -> {
-                        try {
-                            if (chatResponse.getResult() == null || chatResponse.getResult().getOutput() == null) {
-                                return;
-                            }
-                            var output = chatResponse.getResult().getOutput();
+            if (stream) {
+                // Real streaming with tool support + Spring AI memory advisor
+                Flux<ChatResponse> responseFlux = prompt.stream().chatResponse();
 
-                            // Stream text content chunks
-                            String text = output.getText();
-                            if (text != null && !text.isEmpty()) {
-                                fullResponse.append(text);
-                                sendEvent(emitter, "text", Map.of("content", text));
-                            }
-
-                            // Emit tool call debug events
-                            if (output.hasToolCalls()) {
-                                for (var toolCall : output.getToolCalls()) {
-                                    sendEvent(emitter, "tool_call", Map.of(
-                                            "name", toolCall.name(),
-                                            "args", toolCall.arguments() != null ? toolCall.arguments() : ""));
+                responseFlux
+                        .doOnNext(chatResponse -> {
+                            try {
+                                if (chatResponse.getResult() == null || chatResponse.getResult().getOutput() == null) {
+                                    return;
                                 }
+                                var output = chatResponse.getResult().getOutput();
+
+                                // Stream text content chunks
+                                String text = output.getText();
+                                if (text != null && !text.isEmpty()) {
+                                    fullResponse.append(text);
+                                    sendEvent(emitter, "text", Map.of("content", text));
+                                }
+
+                                // Emit tool call debug events
+                                if (output.hasToolCalls()) {
+                                    for (var toolCall : output.getToolCalls()) {
+                                        sendEvent(emitter, "tool_call", Map.of(
+                                                "name", toolCall.name(),
+                                                "args", toolCall.arguments() != null ? toolCall.arguments() : ""));
+                                    }
+                                }
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
                             }
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
+                        })
+                        .blockLast(Duration.ofMinutes(5));
+            } else {
+                ChatResponse response = prompt.call().chatResponse();
+                if (response != null && response.getResult() != null && response.getResult().getOutput() != null) {
+                    var output = response.getResult().getOutput();
+                    String text = output.getText();
+                    if (text != null && !text.isEmpty()) {
+                        fullResponse.append(text);
+                        sendEvent(emitter, "text", Map.of("content", text));
+                    }
+                    if (output.hasToolCalls()) {
+                        for (var toolCall : output.getToolCalls()) {
+                            sendEvent(emitter, "tool_call", Map.of(
+                                    "name", toolCall.name(),
+                                    "args", toolCall.arguments() != null ? toolCall.arguments() : ""));
                         }
-                    })
-                    .blockLast(Duration.ofMinutes(5));
+                    }
+                }
+            }
 
             sendEvent(emitter, "done", Map.of());
             emitter.complete();
 
-            log.info("[Chat] Streaming completed for session {} ({} chars)", sessionId, fullResponse.length());
+            log.info("[Chat] Processing completed for session {} ({} chars, stream: {})", sessionId, fullResponse.length(), stream);
 
         } catch (Exception e) {
             log.error("[Chat] Error during chat", e);
