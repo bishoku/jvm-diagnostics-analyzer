@@ -95,7 +95,8 @@ All settings can also be passed as environment variables (these override the con
 | `AI_TEMPERATURE` | Response temperature (0-2) | `0.3` |
 | `AI_TRUST_INSECURE_CERTS` | Trust self-signed TLS certs | `false` |
 | `APP_STORAGE_LOCATION` | Upload directory | `/data/uploads` |
-| `MAT_HEAP_SIZE` | Heap for MAT analysis | `4g` |
+| `MAT_HEAP_SIZE` | Heap for MAT analysis | `(unset)` |
+| `DYNAMIC_MAX_MAT_MEMORY` | Max bound for dynamic MAT heap | `8g` |
 | `APP_MAT_TIMEOUT_MINUTES` | MAT analysis timeout | `30` |
 | `JAVA_OPTS` | JVM options | `-Xms512m -Xmx2g` |
 

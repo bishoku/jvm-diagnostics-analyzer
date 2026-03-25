@@ -11,6 +11,7 @@ import com.heapanalyzer.service.AnalysisHistoryService;
 import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.ConfigService;
 import com.heapanalyzer.service.FileStorageService;
+import com.heapanalyzer.service.MatAnalysisService;
 import com.heapanalyzer.service.MatDownloadService;
 import com.heapanalyzer.service.McpSessionManager;
 import com.heapanalyzer.service.SpringAiService;
@@ -46,6 +47,7 @@ public class AnalysisController {
     private final ConfigService configService;
     private final SpringAiService springAiService;
     private final MatDownloadService matDownloadService;
+    private final MatAnalysisService matAnalysisService;
     private final McpSessionManager mcpSessionManager;
     private final McpLogService mcpLogService;
     private final HeapDumpChatService chatService;
@@ -56,6 +58,7 @@ public class AnalysisController {
                               ConfigService configService,
                               SpringAiService springAiService,
                               MatDownloadService matDownloadService,
+                              MatAnalysisService matAnalysisService,
                               McpSessionManager mcpSessionManager,
                               McpLogService mcpLogService,
                               HeapDumpChatService chatService) {
@@ -65,6 +68,7 @@ public class AnalysisController {
         this.configService = configService;
         this.springAiService = springAiService;
         this.matDownloadService = matDownloadService;
+        this.matAnalysisService = matAnalysisService;
         this.mcpSessionManager = mcpSessionManager;
         this.mcpLogService = mcpLogService;
         this.chatService = chatService;
@@ -248,6 +252,18 @@ public class AnalysisController {
                 "downloading", matDownloadService.isDownloading(),
                 "status", matDownloadService.getDownloadStatus(),
                 "progress", matDownloadService.getDownloadProgress()
+        ));
+    }
+
+    @GetMapping("/api/mat/config")
+    @ResponseBody
+    public ResponseEntity<?> matConfig(@RequestParam(value = "fileSizeBytes", required = false, defaultValue = "0") long fileSizeBytes) {
+        String finalHeapSize = "0m";
+        if (fileSizeBytes > 0) {
+            finalHeapSize = matAnalysisService.calculateMatHeap(fileSizeBytes);
+        }
+        return ResponseEntity.ok(Map.of(
+                "finalHeapSize", finalHeapSize
         ));
     }
 

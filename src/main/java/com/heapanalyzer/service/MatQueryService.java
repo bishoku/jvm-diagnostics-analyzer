@@ -45,11 +45,14 @@ public class MatQueryService {
 
     private final MatDownloadService matDownloadService;
     private final long queryTimeoutMinutes;
+    private final MatAnalysisService matAnalysisService;
 
     public MatQueryService(
             MatDownloadService matDownloadService,
+            MatAnalysisService matAnalysisService,
             @Value("${app.mat.timeout-minutes:30}") long queryTimeoutMinutes) {
         this.matDownloadService = matDownloadService;
+        this.matAnalysisService = matAnalysisService;
         this.queryTimeoutMinutes = Math.min(queryTimeoutMinutes, 10); // Queries should be fast
     }
 
@@ -369,10 +372,15 @@ public class MatQueryService {
             throw new IOException("MAT ParseHeapDump.sh not found at: " + parseScript);
         }
 
+        String heapArg = "-vmargs";
+        String xmxArg = "-Xmx" + matAnalysisService.calculateMatHeap(Files.size(hprofPath));
+
         ProcessBuilder pb = new ProcessBuilder(
                 parseScript.toString(),
                 hprofPath.toAbsolutePath().toString(),
-                "-command=" + command
+                "-command=" + command,
+                heapArg,
+                xmxArg
         );
         pb.directory(hprofPath.getParent().toFile());
         pb.redirectErrorStream(true);
@@ -393,10 +401,15 @@ public class MatQueryService {
             throw new IOException("MAT ParseHeapDump.sh not found at: " + parseScript);
         }
 
+        String heapArg = "-vmargs";
+        String xmxArg = "-Xmx" + matAnalysisService.calculateMatHeap(Files.size(hprofPath));
+
         ProcessBuilder pb = new ProcessBuilder(
                 parseScript.toString(),
                 hprofPath.toAbsolutePath().toString(),
-                "-command=oql \"" + query.replace("\"", "\\\"") + "\""
+                "-command=oql \"" + query.replace("\"", "\\\"") + "\"",
+                heapArg,
+                xmxArg
         );
         pb.directory(hprofPath.getParent().toFile());
         pb.redirectErrorStream(true);

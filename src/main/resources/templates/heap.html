@@ -42,6 +42,9 @@
         <h3>Drag &amp; drop your heap dump here</h3>
         <p>or click to browse — supports <code>.hprof</code> files up to 5 GB</p>
         <input type="file" id="file-input" accept=".hprof" style="display: none;"/>
+        <div id="mat-memory-warning" style="display: none; color: #b91c1c; margin-top: 15px; font-weight: 500; padding: 10px; background-color: #fef2f2; border-radius: 6px; border: 1px solid #f87171;">
+            Warning: The configured MAT memory (<span id="mat-allocated-memory"></span>) may be insufficient for this file size. Analysis might fail with OutOfMemoryError. Please increase MAT_HEAP_SIZE or DYNAMIC_MAX_MAT_MEMORY.
+        </div>
     </div>
 
     <!-- Upload Progress -->
@@ -195,9 +198,40 @@
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files.length) {
+            checkFileMemory(e.dataTransfer.files[0]).then(() => handleFile(e.dataTransfer.files[0]));
+        }
     });
-    fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) {
+            checkFileMemory(e.target.files[0]).then(() => handleFile(e.target.files[0]));
+        }
+    });
+
+    async function checkFileMemory(file) {
+        try {
+            const res = await fetch('/api/mat/config?fileSizeBytes=' + file.size);
+            if (res.ok) {
+                const data = await res.json();
+                const memStr = data.finalHeapSize;
+                let allocatedBytes = 0;
+                if (memStr.endsWith('g')) {
+                    allocatedBytes = parseInt(memStr) * 1024 * 1024 * 1024;
+                } else if (memStr.endsWith('m')) {
+                    allocatedBytes = parseInt(memStr) * 1024 * 1024;
+                }
+
+                if (allocatedBytes > 0 && file.size > allocatedBytes) {
+                    $('mat-allocated-memory').innerText = memStr.toUpperCase();
+                    $('mat-memory-warning').style.display = 'block';
+                } else {
+                    $('mat-memory-warning').style.display = 'none';
+                }
+            }
+        } catch (e) {
+            console.error('Failed to check MAT memory config', e);
+        }
+    }
 
     function formatBytes(bytes) {
         if (bytes === 0) return '0 B';
