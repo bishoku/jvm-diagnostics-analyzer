@@ -8,6 +8,7 @@ import com.heapanalyzer.service.AnalysisService;
 import com.heapanalyzer.service.ConfigService;
 import com.heapanalyzer.service.FileStorageService;
 import com.heapanalyzer.service.HeapDumpChatService;
+import com.heapanalyzer.service.MatAnalysisService;
 import com.heapanalyzer.service.MatDownloadService;
 import com.heapanalyzer.service.McpLogService;
 import com.heapanalyzer.service.McpSessionManager;
@@ -46,6 +47,9 @@ class AnalysisControllerTest {
 
     @MockitoBean
     private MatDownloadService matDownloadService;
+
+    @MockitoBean
+    private MatAnalysisService matAnalysisService;
 
     @MockitoBean
     private McpSessionManager mcpSessionManager;

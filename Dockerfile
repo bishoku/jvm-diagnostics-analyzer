@@ -66,10 +66,11 @@ VOLUME /data/uploads
 # These can all be overridden at runtime via docker-compose or docker run -e
 ENV APP_STORAGE_LOCATION=/data/uploads
 ENV APP_MAT_HOME=/opt/mat
-ENV MAT_HEAP_SIZE=4g
+ENV MAT_HEAP_SIZE=
+ENV DYNAMIC_MAX_MAT_MEMORY=8g
 ENV JAVA_OPTS="-Xms512m -Xmx2g"
 
 EXPOSE 8080
 
-# Configure MAT heap at runtime (so MAT_HEAP_SIZE can be overridden), then start the app
-ENTRYPOINT ["sh", "-c", "sed -i '/-Xmx/d' /opt/mat/MemoryAnalyzer.ini && echo \"-Xmx${MAT_HEAP_SIZE}\" >> /opt/mat/MemoryAnalyzer.ini && java $JAVA_OPTS -jar app.jar"]
+# Start the app
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

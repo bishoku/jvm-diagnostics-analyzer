@@ -61,12 +61,18 @@ public class MatAnalysisService {
 
     private final MatDownloadService matDownloadService;
     private final long timeoutMinutes;
+    private final String matHeapSize;
+    private final String dynamicMaxMatMemory;
 
     public MatAnalysisService(
             @Value("${app.mat.home:/opt/mat}") String matHome,
             @Value("${app.mat.timeout-minutes:30}") long timeoutMinutes,
+            @Value("${app.mat.heap-size:}") String matHeapSize,
+            @Value("${app.mat.dynamic-max-memory:8g}") String dynamicMaxMatMemory,
             MatDownloadService matDownloadService) {
         this.timeoutMinutes = timeoutMinutes;
+        this.matHeapSize = matHeapSize;
+        this.dynamicMaxMatMemory = dynamicMaxMatMemory;
         this.matDownloadService = matDownloadService;
     }
 
@@ -76,6 +82,57 @@ public class MatAnalysisService {
      */
     private String getMatHome() {
         return matDownloadService.getEffectiveMatHome();
+    }
+
+    /**
+     * Parse the memory string (e.g. 8g, 1024m) to bytes.
+     */
+    private long parseMemoryString(String mem) {
+        if (mem == null || mem.trim().isEmpty()) return 0;
+        String val = mem.trim().toLowerCase();
+        long multiplier = 1;
+        if (val.endsWith("g") || val.endsWith("gb")) {
+            multiplier = 1024L * 1024L * 1024L;
+            val = val.replaceAll("[^0-9]", "");
+        } else if (val.endsWith("m") || val.endsWith("mb")) {
+            multiplier = 1024L * 1024L;
+            val = val.replaceAll("[^0-9]", "");
+        } else if (val.endsWith("k") || val.endsWith("kb")) {
+            multiplier = 1024L;
+            val = val.replaceAll("[^0-9]", "");
+        }
+        try {
+            return Long.parseLong(val) * multiplier;
+        } catch (NumberFormatException e) {
+            log.warn("Invalid memory string: {}", mem);
+            return 0;
+        }
+    }
+
+    /**
+     * Dynamically calculates MAT heap allocation.
+     * Respects MAT_HEAP_SIZE if specified, otherwise bounded by file size and DYNAMIC_MAX_MAT_MEMORY.
+     */
+    public String calculateMatHeap(long fileSizeBytes) {
+        if (matHeapSize != null && !matHeapSize.trim().isEmpty()) {
+            return matHeapSize.trim();
+        }
+
+        // Recommend heap size matching the file size with a bit of buffer
+        long targetBytes = (long) (fileSizeBytes * 1.2);
+
+        long maxBytes = parseMemoryString(dynamicMaxMatMemory);
+        if (maxBytes > 0 && targetBytes > maxBytes) {
+            targetBytes = maxBytes;
+        }
+
+        // Ensure a sensible minimum (e.g. 2GB)
+        long minBytes = 2L * 1024 * 1024 * 1024;
+        if (targetBytes < minBytes) {
+            targetBytes = minBytes;
+        }
+
+        return (targetBytes / (1024 * 1024)) + "m";
     }
 
     /**
@@ -99,12 +156,17 @@ public class MatAnalysisService {
 
         log.info("Starting MAT analysis on {} (timeout: {} min)", heapDumpPath, timeoutMinutes);
 
+        String heapArg = "-vmargs";
+        String xmxArg = "-Xmx" + calculateMatHeap(Files.size(heapDumpPath));
+
         // Run both Leak Suspects and Overview reports in a single MAT invocation
         ProcessBuilder pb = new ProcessBuilder(
                 parseScript.toString(),
                 heapDumpPath.toAbsolutePath().toString(),
                 "org.eclipse.mat.api:suspects",
-                "org.eclipse.mat.api:overview"
+                "org.eclipse.mat.api:overview",
+                heapArg,
+                xmxArg
         );
         pb.directory(heapDumpPath.getParent().toFile());
         pb.redirectErrorStream(true);

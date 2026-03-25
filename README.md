@@ -136,6 +136,8 @@ All settings can be overridden via environment variables:
 | `AI_TEMPERATURE` | `0.3` | Response temperature |
 | `MAX_FILE_SIZE` | `5GB` | Max upload file size |
 | `MAX_REQUEST_SIZE` | `5GB` | Max HTTP request size |
+| `MAT_HEAP_SIZE` | `(unset)` | Explicit heap size for MAT |
+| `DYNAMIC_MAX_MAT_MEMORY` | `8g` | Max upper bound for dynamic MAT heap calculation |
 | `FILE_SIZE_THRESHOLD` | `10MB` | Threshold before writing to disk |
 | `APP_MAT_TIMEOUT_MINUTES` | `30` | Max time for MAT analysis |
 | `JAVA_OPTS` | `-Xms512m -Xmx2g` | JVM options for the app |

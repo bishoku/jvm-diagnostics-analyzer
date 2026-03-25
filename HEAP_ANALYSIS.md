@@ -128,7 +128,8 @@ The LLM receives a system prompt that explicitly references the 6 sections. It i
 |---|---|---|
 | `APP_MAT_HOME` | `/opt/mat` | Path to Eclipse MAT installation |
 | `APP_MAT_TIMEOUT_MINUTES` | `30` | MAT analysis timeout |
-| `MAT_HEAP_SIZE` | `4g` | Heap allocated to the MAT process |
+| `MAT_HEAP_SIZE` | `(unset)` | Explicit MAT heap size (disables dynamic logic) |
+| `DYNAMIC_MAX_MAT_MEMORY` | `8g` | Max bound for dynamic MAT heap calculation based on file size |
 
 For very large heap dumps (>2 GB), increase `MAT_HEAP_SIZE` to at least `8g`:
 

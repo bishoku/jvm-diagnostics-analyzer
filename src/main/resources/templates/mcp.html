@@ -756,6 +756,9 @@
                 <h3>Drop your .hprof file here</h3>
                 <p>or click to browse — the heap dump will be parsed for interactive querying</p>
                 <input type="file" id="fileInput" accept=".hprof" />
+                <div id="mat-memory-warning" style="display: none; color: #b91c1c; margin-top: 15px; font-weight: 500; padding: 10px; background-color: #fef2f2; border-radius: 6px; border: 1px solid #f87171; text-align: left;">
+                    Warning: The configured MAT memory (<span id="mat-allocated-memory"></span>) may be insufficient for this file size. Analysis might fail with OutOfMemoryError. Please increase MAT_HEAP_SIZE or DYNAMIC_MAX_MAT_MEMORY.
+                </div>
             </div>
             <div id="uploadProgress" class="upload-progress">
                 <div class="upload-info">
